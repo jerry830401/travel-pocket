@@ -1,0 +1,68 @@
+[
+    {
+        "id": "1",
+        "day": 1,
+        "date": "2024-04-01",
+        "items": [
+            {
+                "id": "1-1",
+                "title": "Arrive at Narita",
+                "location": "Narita Airport",
+                "category": "transport",
+                "startTime": "14:00",
+                "endTime": "15:00",
+                "coordinates": {
+                    "lat": 35.7719867,
+                    "lng": 140.3906561
+                },
+                "description": "Pick up WiFi and JR Pass."
+            },
+            {
+                "id": "1-2",
+                "title": "Check-in Hotel",
+                "location": "Shinjuku Granbell Hotel",
+                "category": "accommodation",
+                "startTime": "16:30",
+                "endTime": "17:00",
+                "coordinates": {
+                    "lat": 35.6954,
+                    "lng": 139.7047
+                },
+                "description": "Rest for a bit."
+            },
+            {
+                "id": "1-3",
+                "title": "Dinner at Omoide Yokocho",
+                "location": "Shinjuku",
+                "category": "food",
+                "startTime": "18:00",
+                "endTime": "20:00",
+                "coordinates": {
+                    "lat": 35.6929,
+                    "lng": 139.7007
+                },
+                "description": "Yakitori alley. Cash only."
+            }
+        ]
+    },
+    {
+        "id": "2",
+        "day": 2,
+        "date": "2024-04-02",
+        "items": [
+            {
+                "id": "2-1",
+                "title": "Tsukiji Outer Market",
+                "location": "Tsukiji",
+                "category": "food",
+                "startTime": "09:00",
+                "endTime": "11:00",
+                "coordinates": {
+                    "lat": 35.6655,
+                    "lng": 139.7706
+                },
+                "description": "Fresh sushi breakfast."
+            }
+        ]
+    }
+]
