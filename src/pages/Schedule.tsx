@@ -14,7 +14,7 @@ const Schedule = () => {
 
     useEffect(() => {
         if (!trip) return;
-        fetch(`/data/${trip.id}/itinerary.json`)
+        fetch(`${import.meta.env.BASE_URL}data/${trip.id}/itinerary.json`)
             .then(res => res.json())
             .then(data => setDays(data));
     }, [trip]);

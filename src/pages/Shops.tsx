@@ -11,7 +11,7 @@ const Shops = () => {
 
     useEffect(() => {
         if (!trip) return;
-        fetch(`/data/${trip.id}/shops.json`)
+        fetch(`${import.meta.env.BASE_URL}data/${trip.id}/shops.json`)
             .then((res) => res.json())
             .then((data) => setShops(data));
     }, [trip]);

@@ -10,7 +10,7 @@ const TripView = () => {
 
     useEffect(() => {
         // In a real app, we might search the trips list or fetch specific trip details
-        fetch('/data/trips.json')
+        fetch(`${import.meta.env.BASE_URL}data/trips.json`)
             .then(res => res.json())
             .then((data: Trip[]) => {
                 const found = data.find(t => t.id === tripId);

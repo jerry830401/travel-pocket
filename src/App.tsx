@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
 import TripView from './pages/TripView';
 import Schedule from './pages/Schedule';
@@ -8,7 +8,7 @@ import InfoDetail from './pages/InfoDetail';
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       {/* Background for Desktop */}
       <div className="bg-gray-100 min-h-dvh flex justify-center">
         {/* Mobile View Container */}
@@ -25,7 +25,7 @@ function App() {
           </Routes>
         </div>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

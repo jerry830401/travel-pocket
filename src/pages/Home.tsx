@@ -7,7 +7,7 @@ const Home = () => {
     const [trips, setTrips] = useState<Trip[]>([]);
 
     useEffect(() => {
-        fetch('/data/trips.json')
+        fetch(`${import.meta.env.BASE_URL}data/trips.json`)
             .then((res) => res.json())
             .then((data) => setTrips(data))
             .catch((err) => console.error('Failed to load trips', err));

@@ -9,7 +9,7 @@ const Info = () => {
 
     useEffect(() => {
         if (!trip) return;
-        fetch(`/data/${trip.id}/info.json`)
+        fetch(`${import.meta.env.BASE_URL}data/${trip.id}/info.json`)
             .then((res) => res.json())
             .then((data) => setItems(data))
             .catch(console.error);

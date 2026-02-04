@@ -19,12 +19,12 @@ const InfoDetail = () => {
         // I need to fetch the list first to allow mapping ID to file, or simpler: 
         // fetch `/data/${trip.id}/info.json` and find the item
 
-        fetch(`/data/${trip.id}/info.json`)
+        fetch(`${import.meta.env.BASE_URL}data/${trip.id}/info.json`)
             .then(res => res.json())
             .then((items: InfoItem[]) => {
                 const item = items.find(i => i.id === infoId);
                 if (item) {
-                    return fetch(`/data/${trip.id}/info/${item.file}`);
+                    return fetch(`${import.meta.env.BASE_URL}data/${trip.id}/info/${item.file}`);
                 }
                 throw new Error('Info item not found');
             })
