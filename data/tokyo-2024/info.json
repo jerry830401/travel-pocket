@@ -1,0 +1,23 @@
+[
+    {
+        "id": "essentials",
+        "title": "Essentials",
+        "description": "Emergency numbers and basic etiquette.",
+        "file": "essentials.md",
+        "icon": "AlertCircle"
+    },
+    {
+        "id": "transport",
+        "title": "Transport Guide",
+        "description": "How to get around Tokyo.",
+        "file": "transport.md",
+        "icon": "Train"
+    },
+    {
+        "id": "culture",
+        "title": "Cultural Notes",
+        "description": "Do's and Don'ts in Japan.",
+        "file": "culture.md",
+        "icon": "BookOpen"
+    }
+]
