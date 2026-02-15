@@ -10,9 +10,9 @@ function App() {
   return (
     <HashRouter>
       {/* Background for Desktop */}
-      <div className="bg-gray-100 min-h-dvh flex justify-center">
+      <div className="bg-gray-100 h-full w-full flex justify-center overflow-hidden">
         {/* Mobile View Container */}
-        <div className="w-full max-w-[480px] bg-white min-h-dvh shadow-xl relative flex flex-col">
+        <div className="w-full max-w-[480px] bg-white h-full shadow-xl relative flex flex-col">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/trip/:tripId" element={<TripView />}>

@@ -21,7 +21,7 @@ const TripView = () => {
     if (!trip) return <div className="p-10 text-center text-gray-500">Loading trip details...</div>;
 
     return (
-        <div className="flex flex-col h-dvh bg-gray-50">
+        <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
             <header className="bg-white border-b border-gray-100 px-4 py-3 z-30 flex items-center shadow-sm shrink-0">
                 <Link to="/" className="mr-3 p-1 rounded-full hover:bg-gray-100">
@@ -33,7 +33,7 @@ const TripView = () => {
             </header>
 
             {/* Content Area */}
-            <main className="flex-1 overflow-y-auto bg-gray-50 scroll-smooth">
+            <main className="flex-1 overflow-y-auto bg-gray-50 scroll-smooth overscroll-y-contain">
                 <Outlet context={{ trip }} />
             </main>
 
