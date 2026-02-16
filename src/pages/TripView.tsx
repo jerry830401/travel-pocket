@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useParams, Link } from 'react-router-dom';
 import type { Trip } from '../types';
 import { Calendar, ShoppingBag, Info, ChevronLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import clsx from 'clsx';
 
 const TripView = () => {
+    const { t } = useTranslation();
     const { tripId } = useParams();
     const [trip, setTrip] = useState<Trip | null>(null);
 
@@ -18,7 +21,7 @@ const TripView = () => {
             });
     }, [tripId]);
 
-    if (!trip) return <div className="p-10 text-center text-gray-500">Loading trip details...</div>;
+    if (!trip) return <div className="p-10 text-center text-gray-500">{t('common.loading')}</div>;
 
     return (
         <div className="flex flex-col h-full bg-gray-50">
@@ -30,6 +33,7 @@ const TripView = () => {
                 <h1 className="text-lg font-bold text-gray-800 truncate flex-1">
                     {trip.name}
                 </h1>
+                <LanguageSwitcher />
             </header>
 
             {/* Content Area */}
@@ -51,7 +55,7 @@ const TripView = () => {
                     {({ isActive }) => (
                         <>
                             <Calendar className={clsx("w-6 h-6 mb-0.5 transition-transform", isActive && "scale-110")} />
-                            <span className="text-[10px] font-medium">Schedule</span>
+                            <span className="text-[10px] font-medium">{t('nav.schedule')}</span>
                         </>
                     )}
                 </NavLink>
@@ -67,7 +71,7 @@ const TripView = () => {
                     {({ isActive }) => (
                         <>
                             <ShoppingBag className={clsx("w-6 h-6 mb-0.5 transition-transform", isActive && "scale-110")} />
-                            <span className="text-[10px] font-medium">Shops</span>
+                            <span className="text-[10px] font-medium">{t('nav.shops')}</span>
                         </>
                     )}
                 </NavLink>
@@ -83,7 +87,7 @@ const TripView = () => {
                     {({ isActive }) => (
                         <>
                             <Info className={clsx("w-6 h-6 mb-0.5 transition-transform", isActive && "scale-110")} />
-                            <span className="text-[10px] font-medium">Info</span>
+                            <span className="text-[10px] font-medium">{t('nav.info')}</span>
                         </>
                     )}
                 </NavLink>

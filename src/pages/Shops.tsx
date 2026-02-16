@@ -2,9 +2,11 @@ import { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { Trip, Shop } from '../types';
 import { MapPin, Clock, ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 
 const Shops = () => {
+    const { t } = useTranslation();
     const { trip } = useOutletContext<{ trip: Trip }>();
     const [shops, setShops] = useState<Shop[]>([]);
     const [selectedTag, setSelectedTag] = useState<string>('All');
@@ -41,7 +43,7 @@ const Shops = () => {
                                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
                         )}
                     >
-                        {tag}
+                        {tag === 'All' ? t('shops.all') : tag}
                     </button>
                 ))}
             </div>
@@ -89,7 +91,7 @@ const Shops = () => {
 
                 {filteredShops.length === 0 && (
                     <div className="text-center text-gray-500 py-10">
-                        No shops found for this category.
+                        {t('shops.no_shops_found')}
                     </div>
                 )}
             </div>

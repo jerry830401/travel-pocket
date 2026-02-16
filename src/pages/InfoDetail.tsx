@@ -3,8 +3,10 @@ import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import type { Trip, InfoItem } from '../types';
 import { ChevronLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const InfoDetail = () => {
+    const { t } = useTranslation();
     const { trip } = useOutletContext<{ trip: Trip }>();
     const { infoId } = useParams();
     const navigate = useNavigate();
@@ -35,7 +37,7 @@ const InfoDetail = () => {
             })
             .catch(err => {
                 console.error(err);
-                setContent('# Error\nCould not load content.');
+                setContent(`# ${t('common.error')}\nCould not load content.`);
                 setLoading(false);
             });
 
@@ -50,7 +52,7 @@ const InfoDetail = () => {
                 >
                     <ChevronLeft className="w-6 h-6" />
                 </button>
-                <span className="font-bold text-lg text-gray-800">Reading</span>
+                <span className="font-bold text-lg text-gray-800">{t('info.reading')}</span>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 pb-20">

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { Trip, ItineraryDay, ItineraryItem } from '../types';
-import { MapPin, Clock, Coffee, Bed, Landmark, Bus, MoreHorizontal, X, PlaneLanding, TrainFront } from 'lucide-react';
+import { MapPin, Clock, Coffee, Bed, Landmark, Bus, MoreHorizontal, X, PlaneLanding, TrainFront, ExternalLink as ExternalLinkWrapper } from 'lucide-react';
 import { format, parse, differenceInMinutes } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
 
 const Schedule = () => {
+    const { t } = useTranslation();
     const { trip } = useOutletContext<{ trip: Trip }>();
     const [days, setDays] = useState<ItineraryDay[]>([]);
     const [selectedDayIndex, setSelectedDayIndex] = useState(0);
@@ -101,7 +103,9 @@ const Schedule = () => {
                                 <div className="flex items-center justify-center py-2">
                                     <div className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full flex items-center">
                                         <Clock className="w-3 h-3 mr-1" />
-                                        {Math.floor(gapMinutes / 60) > 0 ? `${Math.floor(gapMinutes / 60)}h ` : ''}{gapMinutes % 60}m transit / free time
+                                        {Math.floor(gapMinutes / 60) > 0
+                                            ? t('schedule.transit_free_time_hours', { hours: Math.floor(gapMinutes / 60), minutes: gapMinutes % 60 })
+                                            : t('schedule.transit_free_time', { minutes: gapMinutes % 60 })}
                                     </div>
                                 </div>
                             )}
@@ -109,7 +113,7 @@ const Schedule = () => {
                     );
                 })}
 
-                {!currentDay && <div className="text-center text-gray-400 py-10">Loading schedule...</div>}
+                {!currentDay && <div className="text-center text-gray-400 py-10">{t('schedule.loading_schedule')}</div>}
             </div>
 
             {/* Detail Sheet */}
@@ -170,7 +174,7 @@ const Schedule = () => {
                                 </div>
 
                                 <div>
-                                    <h3 className="text-sm font-medium text-gray-900 mb-2">Location</h3>
+                                    <h3 className="text-sm font-medium text-gray-900 mb-2">{t('schedule.location')}</h3>
                                     <a
                                         href={selectedItem.googleMapLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedItem.location)}`}
                                         target="_blank"
@@ -187,7 +191,7 @@ const Schedule = () => {
 
                                 {selectedItem.description && (
                                     <div>
-                                        <h3 className="text-sm font-medium text-gray-900 mb-2">Description</h3>
+                                        <h3 className="text-sm font-medium text-gray-900 mb-2">{t('schedule.description')}</h3>
                                         <p className="text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-xl">
                                             {selectedItem.description}
                                         </p>
@@ -201,8 +205,5 @@ const Schedule = () => {
         </div>
     );
 };
-
-// Helper component to avoid import conflict if I imported ExternalLink twice or missed it
-import { ExternalLink as ExternalLinkWrapper } from 'lucide-react';
 
 export default Schedule;

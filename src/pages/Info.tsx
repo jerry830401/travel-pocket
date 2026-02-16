@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import type { Trip, InfoItem } from '../types';
 import { AlertCircle, Train, BookOpen, Info as InfoIcon, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const Info = () => {
+    const { t } = useTranslation();
     const { trip } = useOutletContext<{ trip: Trip }>();
     const [items, setItems] = useState<InfoItem[]>([]);
 
@@ -26,7 +28,7 @@ const Info = () => {
 
     return (
         <div className="p-4 bg-gray-50 min-h-full">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 px-1">Information</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4 px-1">{t('info.title')}</h2>
             <div className="space-y-3">
                 {items.map((item) => (
                     <Link
@@ -47,7 +49,7 @@ const Info = () => {
 
                 {items.length === 0 && (
                     <div className="text-center py-10 text-gray-500">
-                        Loading Information...
+                        {t('info.loading_info')}
                     </div>
                 )}
             </div>
