@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { Trip, ItineraryDay, ItineraryItem } from '../types';
-import { MapPin, Clock, Coffee, Bed, Landmark, Bus, MoreHorizontal, X } from 'lucide-react';
+import { MapPin, Clock, Coffee, Bed, Landmark, Bus, MoreHorizontal, X, PlaneLanding, TrainFront } from 'lucide-react';
 import { format, parse, differenceInMinutes } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -21,24 +21,18 @@ const Schedule = () => {
 
     const currentDay = days[selectedDayIndex];
 
-    const getCategoryIcon = (category: string) => {
-        switch (category) {
-            case 'food': return <Coffee className="w-5 h-5" />;
-            case 'accommodation': return <Bed className="w-5 h-5" />;
-            case 'sightseeing': return <Landmark className="w-5 h-5" />;
-            case 'transport': return <Bus className="w-5 h-5" />;
-            default: return <MoreHorizontal className="w-5 h-5" />;
-        }
-    };
-
-    const getCategoryColor = (category: string) => {
-        switch (category) {
-            case 'food': return 'bg-orange-100 text-orange-600';
-            case 'accommodation': return 'bg-blue-100 text-blue-600';
-            case 'sightseeing': return 'bg-green-100 text-green-600';
-            case 'transport': return 'bg-purple-100 text-purple-600';
-            default: return 'bg-gray-100 text-gray-600';
-        }
+    const getCategoryStyles = (category: string) => {
+        const styles = {
+            planeLanding: { icon: PlaneLanding, color: 'bg-orange-100 text-orange-600' },
+            train: { icon: TrainFront, color: 'bg-orange-100 text-orange-600' },
+            food: { icon: Coffee, color: 'bg-orange-100 text-orange-600' },
+            accommodation: { icon: Bed, color: 'bg-blue-100 text-blue-600' },
+            sightseeing: { icon: Landmark, color: 'bg-green-100 text-green-600' },
+            transport: { icon: Bus, color: 'bg-purple-100 text-purple-600' },
+        };
+        const config = styles[category as keyof typeof styles] || { icon: MoreHorizontal, color: 'bg-gray-100 text-gray-600' };
+        const Icon = config.icon;
+        return { icon: <Icon className="w-5 h-5" />, color: config.color };
     };
 
     return (
@@ -91,8 +85,8 @@ const Schedule = () => {
                                 <div className="flex-1">
                                     <div className="flex justify-between items-start mb-1">
                                         <h3 className="font-bold text-gray-800">{item.title}</h3>
-                                        <span className={clsx("p-1.5 rounded-full", getCategoryColor(item.category))}>
-                                            {getCategoryIcon(item.category)}
+                                        <span className={clsx("p-1.5 rounded-full", getCategoryStyles(item.category).color)}>
+                                            {getCategoryStyles(item.category).icon}
                                         </span>
                                     </div>
                                     <div className="flex items-center text-sm text-gray-500 mb-1">
@@ -152,8 +146,8 @@ const Schedule = () => {
                             <div className="space-y-6">
                                 <div>
                                     <div className="flex items-center space-x-2 mb-2">
-                                        <span className={clsx("p-2 rounded-lg", getCategoryColor(selectedItem.category))}>
-                                            {getCategoryIcon(selectedItem.category)}
+                                        <span className={clsx("p-2 rounded-lg", getCategoryStyles(selectedItem.category).color)}>
+                                            {getCategoryStyles(selectedItem.category).icon}
                                         </span>
                                         <span className="text-sm font-medium text-gray-500 capitalize">{selectedItem.category}</span>
                                     </div>
@@ -178,7 +172,7 @@ const Schedule = () => {
                                 <div>
                                     <h3 className="text-sm font-medium text-gray-900 mb-2">Location</h3>
                                     <a
-                                        href={selectedItem.coordinates ? `https://www.google.com/maps/search/?api=1&query=${selectedItem.coordinates.lat},${selectedItem.coordinates.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedItem.location)}`}
+                                        href={selectedItem.googleMapLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedItem.location)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center justify-between p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors group"

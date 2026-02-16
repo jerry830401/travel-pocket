@@ -13,7 +13,7 @@ export interface ItineraryItem {
     category: 'food' | 'transport' | 'accommodation' | 'sightseeing' | 'other';
     startTime: string;
     endTime: string;
-    coordinates?: { lat: number; lng: number };
+    googleMapLink?: string;
     description?: string;
     thumbnail?: string; // Optional per requirements
 }

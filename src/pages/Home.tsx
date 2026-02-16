@@ -14,15 +14,15 @@ const Home = () => {
     }, []);
 
     return (
-        <div className="flex-1 flex flex-col bg-gray-50">
-            {/* Header Hero */}
-            <div className="bg-blue-600 text-white px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm mb-6">
+        <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+            {/* Header Hero - Fixed */}
+            <div className="bg-blue-600 text-white px-6 pt-12 pb-8 rounded-b-[2rem] shadow-sm shrink-0 z-10 relative">
                 <h1 className="text-3xl font-extrabold mb-1">Travel Pocket</h1>
                 <p className="text-blue-100 opacity-90">Manage your journeys with ease.</p>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 px-4 space-y-5 pb-8">
+            {/* Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 space-y-5 py-6">
                 <h2 className="text-lg font-bold text-gray-800 ml-1">Your Trips</h2>
 
                 {trips.length === 0 ? (
