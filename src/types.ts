@@ -14,7 +14,7 @@ export interface ItineraryItem {
     startTime: string;
     endTime: string;
     googleMapLink?: string;
-    description?: string;
+    description?: string | string[];
     thumbnail?: string; // Optional per requirements
 }
 

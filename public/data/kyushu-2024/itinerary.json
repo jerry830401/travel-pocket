@@ -2,53 +2,147 @@
     {
         "id": "1",
         "day": 1,
-        "date": "2024-04-01",
+        "date": "2024-09-27",
         "items": [
             {
                 "id": "1-1",
-                "title": "福岡機場",
-                "location": "Fukuoka Airport",
-                "category": "planeLanding",
-                "startTime": "16:30",
-                "endTime": "17:00",
-                "googleMapLink": "https://maps.app.goo.gl/cQD5bvL4yjQLYaTE8",
-                "description": "搭乘\"4號巴士\"前往博多車站"
+                "title": "小港機場出發",
+                "location": "Kaohsiung International Airport",
+                "category": "planeTakeoff",
+                "startTime": "11:30",
+                "endTime": "13:20",
+                "googleMapLink": "",
+                "description": ""
             },
             {
                 "id": "1-2",
-                "title": "博多車站",
-                "location": "Hakata Station",
-                "category": "train",
-                "startTime": "17:30",
-                "endTime": "18:00",
-                "googleMapLink": "https://maps.app.goo.gl/abv5eNrjYLvriULZA",
-                "description": "換取 JR Pass"
+                "title": "抵達福岡機場",
+                "location": "Fukuoka Airport",
+                "category": "planeLanding",
+                "startTime": "17:05",
+                "endTime": "17:35",
+                "googleMapLink": "https://maps.app.goo.gl/cQD5bvL4yjQLYaTE8",
+                "description": [
+                    "搭乘\"4號月台巴士\"前往博多車站"
+                ]
             },
             {
                 "id": "1-3",
+                "title": "博多車站",
+                "location": "Hakata Station",
+                "category": "train",
+                "startTime": "18:00",
+                "endTime": "18:30",
+                "googleMapLink": "https://maps.app.goo.gl/abv5eNrjYLvriULZA",
+                "description": [
+                    "換取 JR Pass",
+                    "搭乘\"九州新幹線\"前往熊本車站"
+                ]
+            },
+            {
+                "id": "1-4",
                 "title": "熊本車站",
                 "location": "Kumamoto Station",
                 "category": "train",
-                "startTime": "18:30",
-                "endTime": "19:30",
+                "startTime": "19:30",
+                "endTime": "19:45",
                 "googleMapLink": "https://maps.app.goo.gl/HYNhS1YpH5sK9KkLA",
+                "description": ""
+            },
+            {
+                "id": "1-5",
+                "title": "住宿報到",
+                "location": "Toyoko Inn Kumamoto-Ekimae",
+                "category": "hotel",
+                "startTime": "20:00",
+                "endTime": "",
+                "googleMapLink": "https://maps.app.goo.gl/fw26kJRcGHpPRfYW6",
                 "description": ""
             }
         ]
     },
     {
         "id": "2",
-        "day": 2,
-        "date": "2024-04-02",
+        "day": "2",
+        "date": "2024-09-28",
         "items": [
             {
                 "id": "2-1",
-                "title": "Tsukiji Outer Market",
-                "location": "Tsukiji",
-                "category": "food",
-                "startTime": "09:00",
-                "endTime": "11:00",
-                "description": "Fresh sushi breakfast."
+                "title": "博多車站前往阿蘇",
+                "location": "Hakata Station",
+                "category": "train",
+                "startTime": "10:20",
+                "endTime": "10:32",
+                "googleMapLink": "",
+                "description": [
+                    "搭乘\"翡翠 or 山翡翠\"號"
+                ]
+            },
+            {
+                "id": "2-2",
+                "title": "阿蘇車站",
+                "location": "Aso Station",
+                "category": "train",
+                "startTime": "12:03",
+                "endTime": "12:10",
+                "googleMapLink": "",
+                "description": [
+                    "搭乘\"阿蘇火山口線\""
+                ]
+            },
+            {
+                "id": "2-3",
+                "title": "草千里&覓食",
+                "location": "草千里ヶ浜",
+                "category": "sightseeing",
+                "startTime": "12:46",
+                "endTime": "13:58",
+                "googleMapLink": "https://maps.app.goo.gl/3ooZCUY1zuUQvJDe9",
+                "description": ""
+            },
+            {
+                "id": "2-4",
+                "title": "阿蘇山上廣場",
+                "location": "阿蘇 山上広場",
+                "category": "sightseeing",
+                "startTime": "14:10",
+                "endTime": "15:10",
+                "googleMapLink": "",
+                "description": ""
+            },
+            {
+                "id": "2-5",
+                "title": "阿蘇車站",
+                "location": "Aso Station",
+                "category": "train",
+                "startTime": "15:50",
+                "endTime": "16:41",
+                "googleMapLink": "",
+                "description": [
+                    "搭乘JR豐肥本線 -> 肥後大津站"
+                ]
+            },
+            {
+                "id": "2-6",
+                "title": "肥後大津站",
+                "location": "肥後大津站",
+                "category": "train",
+                "startTime": "17:27",
+                "endTime": "17:31",
+                "googleMapLink": "https://maps.app.goo.gl/rAtgi4TZ6Dtiuh5w5",
+                "description": [
+                    "搭乘對面的JR豐肥本線 -> 博多車站"
+                ]
+            },
+            {
+                "id": "2-7",
+                "title": "博多車站",
+                "location": "Hakata Station",
+                "category": "train",
+                "startTime": "18:20",
+                "endTime": "",
+                "googleMapLink": "",
+                "description": ""
             }
         ]
     }

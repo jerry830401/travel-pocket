@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { Trip, ItineraryDay, ItineraryItem } from '../types';
-import { MapPin, Clock, Coffee, Bed, Landmark, Bus, MoreHorizontal, X, PlaneLanding, TrainFront, ExternalLink as ExternalLinkWrapper } from 'lucide-react';
+import { MapPin, Clock, Coffee, Landmark, Bus, MoreHorizontal, X, PlaneLanding, TrainFront, ExternalLink as ExternalLinkWrapper, Hotel, PlaneTakeoff } from 'lucide-react';
 import { format, parse, differenceInMinutes } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -25,10 +25,12 @@ const Schedule = () => {
 
     const getCategoryStyles = (category: string) => {
         const styles = {
+            planeTakeoff: { icon: PlaneTakeoff, color: 'bg-orange-100 text-orange-600' },
             planeLanding: { icon: PlaneLanding, color: 'bg-orange-100 text-orange-600' },
             train: { icon: TrainFront, color: 'bg-orange-100 text-orange-600' },
+            bus: { icon: Bus, color: 'bg-orange-100 text-orange-600' },
+            hotel: { icon: Hotel, color: 'bg-blue-100 text-blue-600' },
             food: { icon: Coffee, color: 'bg-orange-100 text-orange-600' },
-            accommodation: { icon: Bed, color: 'bg-blue-100 text-blue-600' },
             sightseeing: { icon: Landmark, color: 'bg-green-100 text-green-600' },
             transport: { icon: Bus, color: 'bg-purple-100 text-purple-600' },
         };
@@ -192,9 +194,17 @@ const Schedule = () => {
                                 {selectedItem.description && (
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-900 mb-2">{t('schedule.description')}</h3>
-                                        <p className="text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-xl">
-                                            {selectedItem.description}
-                                        </p>
+                                        <div className="text-gray-600 leading-relaxed bg-gray-50 p-4 rounded-xl">
+                                            {Array.isArray(selectedItem.description) ? (
+                                                <ol className="list-decimal list-inside space-y-1">
+                                                    {selectedItem.description.map((desc, i) => (
+                                                        <li key={i}>{desc}</li>
+                                                    ))}
+                                                </ol>
+                                            ) : (
+                                                selectedItem.description
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

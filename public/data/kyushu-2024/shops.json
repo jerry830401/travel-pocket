@@ -1,37 +1,44 @@
 [
     {
         "id": "s1",
-        "name": "Nintendo Tokyo",
-        "location": "Shibuya Parco 6F",
+        "name": "Bic Camera - 熊本",
+        "location": "Bic Camera Kumamoto",
         "tags": [
+            "うさぎ",
             "轉蛋",
-            "games",
-            "exclusive"
+            "家電"
         ],
-        "businessHours": "10:00 - 21:00",
-        "googleMapLink": "https://maps.app.goo.gl/example"
+        "businessHours": "10:00 - 20:00",
+        "googleMapLink": "https://maps.app.goo.gl/ja29CVcAgqgzhpDc7"
     },
     {
         "id": "s2",
-        "name": "Pokémon Center Mega Tokyo",
-        "location": "Sunshine City 2F",
+        "name": "勝烈亭 - AMU PLAZA熊本店",
+        "location": "AMU PLAZA熊本店 7F",
         "tags": [
-            "toys",
-            "games"
+            "飲食"
         ],
-        "businessHours": "10:00 - 20:00",
-        "googleMapLink": "https://maps.app.goo.gl/example2"
+        "businessHours": "11:00 - 22:00",
+        "googleMapLink": "https://maps.app.goo.gl/RoirNhXJFcn2K5jf7"
     },
     {
         "id": "s3",
-        "name": "Don Quijote Shinjuku",
-        "location": "Shinjuku",
+        "name": "熊本拉麵黑亭 - 熊本車站本店",
+        "location": "熊本ラーメン 黒亭 本店",
         "tags": [
-            "snacks",
-            "souvenirs",
-            "cosmetics"
+            "飲食"
         ],
-        "businessHours": "24h",
-        "googleMapLink": "https://maps.app.goo.gl/example3"
+        "businessHours": "10:30 - 20:30",
+        "googleMapLink": "https://maps.app.goo.gl/B9f25unzRU6kUHoH7"
+    },
+    {
+        "id": "s4",
+        "name": "UNIQLO - AMU PLAZA熊本店",
+        "location": "AMU PLAZA熊本店 4F",
+        "tags": [
+            "衣服"
+        ],
+        "businessHours": "10:00 - 20:00",
+        "googleMapLink": "https://maps.app.goo.gl/grkab6aSCFc7crTz7"
     }
 ]
