@@ -34,10 +34,14 @@ export interface Shop {
     googleMapLink: string;
 }
 
+export interface InfoLink {
+    label: string;
+    url: string;
+}
+
 export interface InfoItem {
     id: string;
     title: string;
-    description: string;
-    file: string;
-    icon: 'AlertCircle' | 'Train' | 'BookOpen' | 'Info';
+    icon: string;
+    links: InfoLink[];
 }

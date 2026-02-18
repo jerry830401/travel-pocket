@@ -5,5 +5,12 @@
         "startDate": "2024-09-27",
         "endDate": "2024-10-04",
         "coverImage": "https://placehold.co/600x400?text=Kyushu"
+    },
+    {
+        "id": "sendai-2026",
+        "name": "仙台",
+        "startDate": "2026-03-21",
+        "endDate": "2026-03-28",
+        "coverImage": "https://placehold.co/600x400?text=Sendai"
     }
 ]

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { Trip, ItineraryDay, ItineraryItem } from '../types';
-import { MapPin, Clock, Coffee, Landmark, Bus, MoreHorizontal, X, PlaneLanding, TrainFront, ExternalLink as ExternalLinkWrapper, Hotel, PlaneTakeoff } from 'lucide-react';
+import { MapPin, Clock, Landmark, Bus, MoreHorizontal, X, PlaneLanding, TrainFront, ExternalLink as ExternalLinkWrapper, Hotel, PlaneTakeoff, CarFront, UtensilsCrossed } from 'lucide-react';
 import { format, parse, differenceInMinutes } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
@@ -29,8 +29,9 @@ const Schedule = () => {
             planeLanding: { icon: PlaneLanding, color: 'bg-orange-100 text-orange-600' },
             train: { icon: TrainFront, color: 'bg-orange-100 text-orange-600' },
             bus: { icon: Bus, color: 'bg-orange-100 text-orange-600' },
+            car: { icon: CarFront, color: 'bg-orange-100 text-orange-600' },
             hotel: { icon: Hotel, color: 'bg-blue-100 text-blue-600' },
-            food: { icon: Coffee, color: 'bg-orange-100 text-orange-600' },
+            food: { icon: UtensilsCrossed, color: 'bg-orange-100 text-orange-600' },
             sightseeing: { icon: Landmark, color: 'bg-green-100 text-green-600' },
             transport: { icon: Bus, color: 'bg-purple-100 text-purple-600' },
         };

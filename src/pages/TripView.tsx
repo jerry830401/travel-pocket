@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useParams, Link } from 'react-router-dom';
 import type { Trip } from '../types';
-import { Calendar, ShoppingBag, Info, ChevronLeft } from 'lucide-react';
+import { Calendar, Store, Info, ChevronLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import clsx from 'clsx';
@@ -70,7 +70,7 @@ const TripView = () => {
                 >
                     {({ isActive }) => (
                         <>
-                            <ShoppingBag className={clsx("w-6 h-6 mb-0.5 transition-transform", isActive && "scale-110")} />
+                            <Store className={clsx("w-6 h-6 mb-0.5 transition-transform", isActive && "scale-110")} />
                             <span className="text-[10px] font-medium">{t('nav.shops')}</span>
                         </>
                     )}
