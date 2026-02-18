@@ -17,6 +17,16 @@ body {
   overscroll-behavior-y: none; /* Prevent pull-to-refresh / rubber-banding */
 }
 
+/* Safe area utilities for PWA / notch devices */
+@layer utilities {
+  .pt-safe-home {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+  }
+  .pt-safe {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  }
+}
+
 body {
   min-width: 320px;
   background-color: #f3f4f6;
