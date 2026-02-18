@@ -6,7 +6,8 @@
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -14,6 +15,16 @@ html, body {
   height: 100dvh;
   overflow: hidden; /* Prevent body scroll */
   overscroll-behavior-y: none; /* Prevent pull-to-refresh / rubber-banding */
+}
+
+/* Safe area utilities for PWA / notch devices */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }
 
 body {
