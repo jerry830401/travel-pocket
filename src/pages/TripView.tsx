@@ -48,7 +48,7 @@ const TripView = () => {
 
       {/* Bottom Navigation */}
       <nav className="bg-white border-t border-gray-100 shrink-0 pb-safe z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
-        <div className="flex justify-around items-center h-[3.5rem]">
+        <div className="flex justify-around items-center h-[3rem]">
           <NavLink
             to="schedule"
             className={({ isActive }) =>
