@@ -31,7 +31,7 @@ const TripView = () => {
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100 px-4 pb-3 pt-safe-offset z-30 flex items-center shadow-sm shrink-0">
+      <header className="bg-white border-b border-gray-100 px-4 py-3 z-30 flex items-center shadow-sm shrink-0">
         <Link to="/" className="mr-3 p-1 rounded-full hover:bg-gray-100">
           <ChevronLeft className="w-6 h-6 text-gray-700" />
         </Link>
@@ -47,8 +47,8 @@ const TripView = () => {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="bg-white border-t border-gray-100 shrink-0 pb-safe z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
-        <div className="flex justify-around items-center h-[3rem]">
+      <nav className="bg-white border-t border-gray-100 shrink-0 z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
+        <div className="flex justify-around items-center h-[3.5rem]">
           <NavLink
             to="schedule"
             className={({ isActive }) =>
