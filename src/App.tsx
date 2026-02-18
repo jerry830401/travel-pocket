@@ -4,7 +4,6 @@ import TripView from './pages/TripView';
 import Schedule from './pages/Schedule';
 import Shops from './pages/Shops';
 import Info from './pages/Info';
-import InfoDetail from './pages/InfoDetail';
 
 function App() {
   return (
@@ -20,7 +19,6 @@ function App() {
               <Route path="schedule" element={<Schedule />} />
               <Route path="shops" element={<Shops />} />
               <Route path="info" element={<Info />} />
-              <Route path="info/:infoId" element={<InfoDetail />} />
             </Route>
           </Routes>
         </div>
