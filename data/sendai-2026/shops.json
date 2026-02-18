@@ -1,0 +1,14 @@
+[
+    {
+        "id": "s1",
+        "name": "Bic Camera - 熊本",
+        "location": "Bic Camera Kumamoto",
+        "tags": [
+            "うさぎ",
+            "轉蛋",
+            "家電"
+        ],
+        "businessHours": "10:00 - 20:00",
+        "googleMapLink": "https://maps.app.goo.gl/ja29CVcAgqgzhpDc7"
+    }
+]

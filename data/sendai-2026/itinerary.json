@@ -1,0 +1,126 @@
+[
+    {
+        "id": "1",
+        "day": 1,
+        "date": "2026-03-21",
+        "items": [
+            {
+                "id": "1-1",
+                "title": "小港機場出發",
+                "location": "Kaohsiung International Airport",
+                "category": "planeTakeoff",
+                "startTime": "10:30",
+                "endTime": "13:25",
+                "googleMapLink": "",
+                "description": [
+                    "11:00 ~ 12:45 受理報到"
+                ]
+            },
+            {
+                "id": "1-2",
+                "title": "抵達仙台機場",
+                "location": "Sendai Airport",
+                "category": "planeLanding",
+                "startTime": "17:55",
+                "endTime": "18:30",
+                "googleMapLink": "",
+                "description": [
+                    "搭乘\"仙台機場聯通捷運線\""
+                ]
+            },
+            {
+                "id": "1-3",
+                "title": "仙台車站",
+                "location": "Sendai Station",
+                "category": "train",
+                "startTime": "19:00",
+                "endTime": "19:30",
+                "googleMapLink": "",
+                "description": ""
+            },
+            {
+                "id": "1-4",
+                "title": "住宿報到",
+                "location": "仙台蒙特埃馬酒店",
+                "category": "hotel",
+                "startTime": "20:00",
+                "endTime": "",
+                "googleMapLink": "",
+                "description": ""
+            }
+        ]
+    },
+    {
+        "id": "2",
+        "day": "2",
+        "date": "2026-03-22",
+        "items": [
+            {
+                "id": "2-1",
+                "title": "集合坐車出發",
+                "location": "仙台蒙特埃馬酒店",
+                "category": "hotel",
+                "startTime": "08:30",
+                "endTime": "09:00",
+                "googleMapLink": "",
+                "description": ""
+            },
+            {
+                "id": "2-2",
+                "title": "金蛇水神社",
+                "location": "金蛇水神社",
+                "category": "sightseeing",
+                "startTime": "09:45",
+                "endTime": "10:45",
+                "googleMapLink": "",
+                "description": ""
+            },
+            {
+                "id": "2-3",
+                "title": "白石市(午餐)",
+                "location": "白石温麺専門店 つりがね庵",
+                "category": "food",
+                "startTime": "11:30",
+                "endTime": "12:30",
+                "googleMapLink": "",
+                "description": ""
+            },
+            {
+                "id": "2-4",
+                "title": "藏王狐狸村",
+                "location": "宮城蔵王キツネ村",
+                "category": "sightseeing",
+                "startTime": "13:00",
+                "endTime": "14:00",
+                "googleMapLink": "",
+                "description": [
+                    "中學生以上 ¥1000，未滿則免費"
+                ]
+            },
+            {
+                "id": "2-5",
+                "title": "藏王纜車-山麓站",
+                "location": "蔵王ロープウェイ 蔵王山麓駅",
+                "category": "sightseeing",
+                "startTime": "15:30",
+                "endTime": "17:00",
+                "googleMapLink": "",
+                "description": [
+                    "「藏王山麓站」->「樹冰高原站」，成人 ¥2200，小學生 ¥1100",
+                    "「樹冰高原站」->「地藏山頂站」，成人 ¥1200，小學生 ¥600",
+                    "以上都是單程票價，往返需*2"
+                ]
+            },
+            {
+                "id": "2-6",
+                "title": "天童溫泉瀧之湯",
+                "location": "ほほえみの宿滝の湯",
+                "category": "hotel",
+                "startTime": "18:00",
+                "endTime": "",
+                "googleMapLink": "",
+                "description": ""
+            }
+        ]
+    }
+]

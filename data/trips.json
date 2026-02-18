@@ -1,5 +1,12 @@
 [
     {
+        "id": "sendai-2026",
+        "name": "仙台",
+        "startDate": "2026-03-21",
+        "endDate": "2026-03-28",
+        "coverImage": "https://placehold.co/600x400?text=Sendai"
+    },
+    {
         "id": "kyushu-2024",
         "name": "福岡-熊本",
         "startDate": "2024-09-27",
