@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Trip } from "../types";
 import { MapPin, Calendar, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "../components/ThemeToggle";
 
 const Home = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -14,29 +15,40 @@ const Home = () => {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Header Hero - Fixed */}
-      <div className="bg-blue-600 text-white px-6 pb-8 rounded-b-[2rem] shadow-sm shrink-0 z-10 relative pt-safe-home">
-        <h1 className="text-3xl font-extrabold mb-1">Travel Pocket</h1>
-        <p className="text-blue-100 opacity-90">
-          Manage your journeys with ease.
-        </p>
+      <div className="bg-blue-600 dark:bg-blue-800 text-white px-6 pb-8 rounded-b-[2rem] shadow-sm shrink-0 z-10 relative pt-safe-home">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-extrabold mb-1">Travel Pocket</h1>
+            <p className="text-blue-100 opacity-90">
+              Manage your journeys with ease.
+            </p>
+          </div>
+          <div className="mt-1">
+            <ThemeToggle className="p-2 rounded-full hover:bg-white/20 transition-colors text-white" />
+          </div>
+        </div>
       </div>
 
       {/* Content - Scrollable */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 space-y-5 py-6">
-        <h2 className="text-lg font-bold text-gray-800 ml-1">Your Trips</h2>
+        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 ml-1">
+          Your Trips
+        </h2>
 
         {trips.length === 0 ? (
-          <div className="text-center py-10 opacity-60">Loading trips...</div>
+          <div className="text-center py-10 opacity-60 dark:text-gray-400">
+            Loading trips...
+          </div>
         ) : (
           trips.map((trip) => (
             <Link
               to={`/trip/${trip.id}`}
               key={trip.id}
-              className="group block bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
+              className="group block bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all active:scale-[0.98]"
             >
-              <div className="h-48 bg-gray-200 relative overflow-hidden">
+              <div className="h-48 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
                 <img
                   src={trip.coverImage}
                   alt={trip.name}
@@ -58,11 +70,11 @@ const Home = () => {
               </div>
 
               <div className="p-4 flex justify-between items-center">
-                <div className="flex items-center text-blue-600 text-sm font-medium">
+                <div className="flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium">
                   <MapPin className="w-4 h-4 mr-1.5" />
                   <span>View Itinerary</span>
                 </div>
-                <div className="bg-blue-50 p-2 rounded-full text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <div className="bg-blue-50 dark:bg-blue-900/40 p-2 rounded-full text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 dark:group-hover:bg-blue-500 group-hover:text-white transition-colors">
                   <ArrowRight className="w-4 h-4" />
                 </div>
               </div>

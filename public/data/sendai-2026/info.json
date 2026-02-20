@@ -1,32 +1,32 @@
 [
-    {
-        "id": "tigerair",
-        "title": "交通",
-        "icon": "Plane",
-        "links": [
-            {
-                "label": "虎航 - 搭乘須知",
-                "url": "https://www.tigerairtw.com/zh-tw/welcome-on-board/boarding"
-            },
-            {
-                "label": "虎航 - 行李規定",
-                "url": "https://www.tigerairtw.com/zh-tw/welcome-on-board/baggage"
-            }
-        ]
-    },
-    {
-        "id": "tigerair",
-        "title": "景點",
-        "icon": "Plane",
-        "links": [
-            {
-                "label": "藏王狐狸村",
-                "url": "https://livejapan.com/zh-tw/in-tohoku/in-pref-miyagi/in-miyagi-suburbs/article-a3000044/"
-            },
-            {
-                "label": "藏王纜車",
-                "url": "https://zaoropeway.co.jp/winter/cn.php"
-            }
-        ]
-    }
+  {
+    "id": "tigerair",
+    "title": "交通",
+    "icon": "Plane",
+    "links": [
+      {
+        "label": "虎航 - 搭乘須知",
+        "url": "https://www.tigerairtw.com/zh-tw/welcome-on-board/boarding"
+      },
+      {
+        "label": "虎航 - 行李規定",
+        "url": "https://www.tigerairtw.com/zh-tw/welcome-on-board/baggage"
+      }
+    ]
+  },
+  {
+    "id": "tigerair",
+    "title": "景點",
+    "icon": "Landmark",
+    "links": [
+      {
+        "label": "藏王狐狸村",
+        "url": "https://livejapan.com/zh-tw/in-tohoku/in-pref-miyagi/in-miyagi-suburbs/article-a3000044/"
+      },
+      {
+        "label": "藏王纜車",
+        "url": "https://zaoropeway.co.jp/winter/cn.php"
+      }
+    ]
+  }
 ]

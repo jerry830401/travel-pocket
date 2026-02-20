@@ -33,6 +33,10 @@ body {
   /* gray-100 matches App */
 }
 
+.dark body {
+  background-color: #030712; /* gray-950 */
+}
+
 #root {
   height: 100%;
   width: 100%;
