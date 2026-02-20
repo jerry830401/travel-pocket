@@ -1,14 +1,66 @@
 [
-    {
-        "id": "s1",
-        "name": "Bic Camera - 熊本",
-        "location": "Bic Camera Kumamoto",
-        "tags": [
-            "うさぎ",
-            "轉蛋",
-            "家電"
-        ],
-        "businessHours": "10:00 - 20:00",
-        "googleMapLink": "https://maps.app.goo.gl/ja29CVcAgqgzhpDc7"
-    }
+  {
+    "id": "s1",
+    "name": "ちいかわらんど - 仙台パルコ店",
+    "location": "parco 仙台店 8F",
+    "tags": ["玩具", "轉蛋"],
+    "businessHours": "10:00 - 20:00",
+    "googleMapLink": "https://maps.app.goo.gl/rszM886rMdwcg4bz9"
+  },
+  {
+    "id": "s2",
+    "name": "Pokémon Center - Tohoku",
+    "location": "parco 仙台店 3F",
+    "tags": ["玩具"],
+    "businessHours": "10:00 - 20:00",
+    "googleMapLink": "https://maps.app.goo.gl/twMrx7Tk29JFsPp66"
+  },
+  {
+    "id": "s3",
+    "name": "鳥貴族 - 仙台站西口店",
+    "location": "仙台駅西口",
+    "tags": ["飲食"],
+    "businessHours": "17:00 - 01:00",
+    "googleMapLink": "https://maps.app.goo.gl/1QFbBmYJjr5Trvzd9"
+  },
+  {
+    "id": "s4",
+    "name": "UNIQLO - 仙台駅店",
+    "location": "AER 3F",
+    "tags": ["衣服"],
+    "businessHours": "10:00 - 20:00",
+    "googleMapLink": "https://maps.app.goo.gl/26URRMi22JXneaXy6"
+  },
+  {
+    "id": "s5",
+    "name": "Yodobashi Camera - 仙台店",
+    "location": "Yodobashi Camera sendai",
+    "tags": ["家電", "玩具", "轉蛋"],
+    "businessHours": "9:30 - 22:00",
+    "googleMapLink": "https://maps.app.goo.gl/jddzwcgMgXvPzzNj9"
+  },
+  {
+    "id": "s6",
+    "name": "唐吉訶德 - 仙台站西口店",
+    "location": "ドン・キホーテ 仙台駅西口本店",
+    "tags": ["藥妝", "玩具", "轉蛋"],
+    "businessHours": "10:00 - 21:00",
+    "googleMapLink": "https://maps.app.goo.gl/BKWH6Bq3n3AXRCYu7"
+  },
+  {
+    "id": "s7",
+    "name": "LOFT - 仙台店",
+    "location": "LOFT 仙台店",
+    "tags": ["玩具", "轉蛋"],
+    "businessHours": "10:00 - 20:00",
+    "googleMapLink": "https://maps.app.goo.gl/iAcDpd9gWdh4WBTU7"
+  },
+  {
+    "id": "s8",
+    "name": "GU - 友都八喜仙台店",
+    "location": "ジーユー ヨドバシ仙台店",
+    "tags": ["衣服"],
+    "businessHours": "10:00 - 21:00",
+    "googleMapLink": "https://maps.app.goo.gl/icg959ucKj7qG52j8"
+  }
 ]
