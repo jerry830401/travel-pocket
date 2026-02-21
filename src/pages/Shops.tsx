@@ -1,12 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, Shop } from "../types";
-import { MapPin, Clock, ExternalLink } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { MapPin, Clock, MapPinned } from "lucide-react";
 import clsx from "clsx";
 
 const Shops = () => {
-  const { t } = useTranslation();
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [shops, setShops] = useState<Shop[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>("All");
@@ -43,7 +41,7 @@ const Shops = () => {
                 : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700",
             )}
           >
-            {tag === "All" ? t("shops.all") : tag}
+            {tag === "All" ? "全部" : tag}
           </button>
         ))}
       </div>
@@ -66,7 +64,7 @@ const Shops = () => {
                   rel="noopener noreferrer"
                   className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-1"
                 >
-                  <ExternalLink className="w-5 h-5" />
+                  <MapPinned className="w-5 h-5" />
                 </a>
               )}
             </div>
@@ -96,7 +94,7 @@ const Shops = () => {
 
         {filteredShops.length === 0 && (
           <div className="text-center text-gray-500 dark:text-gray-400 py-10">
-            {t("shops.no_shops_found")}
+            沒有找到相關類別的商店。
           </div>
         )}
       </div>

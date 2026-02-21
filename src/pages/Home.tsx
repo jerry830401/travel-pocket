@@ -21,9 +21,7 @@ const Home = () => {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-extrabold mb-1">Travel Pocket</h1>
-            <p className="text-blue-100 opacity-90">
-              Manage your journeys with ease.
-            </p>
+            <p className="text-blue-100 opacity-90">您的個人旅遊助手</p>
           </div>
           <div className="mt-1">
             <ThemeToggle className="p-2 rounded-full hover:bg-white/20 transition-colors text-white" />
@@ -34,12 +32,12 @@ const Home = () => {
       {/* Content - Scrollable */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 space-y-5 py-6">
         <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 ml-1">
-          Your Trips
+          我的旅程
         </h2>
 
         {trips.length === 0 ? (
           <div className="text-center py-10 opacity-60 dark:text-gray-400">
-            Loading trips...
+            載入中...
           </div>
         ) : (
           trips.map((trip) => (
@@ -72,7 +70,7 @@ const Home = () => {
               <div className="p-4 flex justify-between items-center">
                 <div className="flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium">
                   <MapPin className="w-4 h-4 mr-1.5" />
-                  <span>View Itinerary</span>
+                  <span>查看行程</span>
                 </div>
                 <div className="bg-blue-50 dark:bg-blue-900/40 p-2 rounded-full text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 dark:group-hover:bg-blue-500 group-hover:text-white transition-colors">
                   <ArrowRight className="w-4 h-4" />

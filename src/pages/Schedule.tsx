@@ -15,14 +15,13 @@ import {
   PlaneTakeoff,
   CarFront,
   UtensilsCrossed,
+  Ship,
 } from "lucide-react";
 import { format, parse, differenceInMinutes } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
-import { useTranslation } from "react-i18next";
 
 const Schedule = () => {
-  const { t } = useTranslation();
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
@@ -50,10 +49,10 @@ const Schedule = () => {
       train: { icon: TrainFront, color: "bg-orange-100 text-orange-600" },
       bus: { icon: Bus, color: "bg-orange-100 text-orange-600" },
       car: { icon: CarFront, color: "bg-orange-100 text-orange-600" },
+      ship: { icon: Ship, color: "bg-orange-100 text-orange-600" },
       hotel: { icon: Hotel, color: "bg-blue-100 text-blue-600" },
       food: { icon: UtensilsCrossed, color: "bg-orange-100 text-orange-600" },
       sightseeing: { icon: Landmark, color: "bg-green-100 text-green-600" },
-      transport: { icon: Bus, color: "bg-purple-100 text-purple-600" },
     };
     const config = styles[category as keyof typeof styles] || {
       icon: MoreHorizontal,
@@ -144,13 +143,8 @@ const Schedule = () => {
                   <div className="text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-full flex items-center">
                     <Clock className="w-3 h-3 mr-1" />
                     {Math.floor(gapMinutes / 60) > 0
-                      ? t("schedule.transit_free_time_hours", {
-                          hours: Math.floor(gapMinutes / 60),
-                          minutes: gapMinutes % 60,
-                        })
-                      : t("schedule.transit_free_time", {
-                          minutes: gapMinutes % 60,
-                        })}
+                      ? `交通 / 自由時間 ${Math.floor(gapMinutes / 60)}小時 ${gapMinutes % 60}分`
+                      : `交通 / 自由時間 ${gapMinutes % 60}分`}
                   </div>
                 </div>
               )}
@@ -160,7 +154,7 @@ const Schedule = () => {
 
         {!currentDay && (
           <div className="text-center text-gray-400 dark:text-gray-500 py-10">
-            {t("schedule.loading_schedule")}
+            載入行程中...
           </div>
         )}
       </div>
@@ -219,7 +213,7 @@ const Schedule = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-xl">
                     <span className="text-xs text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider">
-                      Time
+                      時間
                     </span>
                     <div className="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-0.5">
                       {selectedItem.startTime} - {selectedItem.endTime}
@@ -227,7 +221,7 @@ const Schedule = () => {
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-xl">
                     <span className="text-xs text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider">
-                      Date
+                      日期
                     </span>
                     <div className="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-0.5">
                       Day {currentDay?.day}
@@ -237,7 +231,7 @@ const Schedule = () => {
 
                 <div>
                   <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    {t("schedule.location")}
+                    地點
                   </h3>
                   <a
                     href={
@@ -261,7 +255,7 @@ const Schedule = () => {
                 {selectedItem.description && (
                   <div>
                     <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      {t("schedule.description")}
+                      說明
                     </h3>
                     <div className="text-gray-600 dark:text-gray-300 leading-relaxed bg-gray-50 dark:bg-gray-700 p-4 rounded-xl">
                       {Array.isArray(selectedItem.description) ? (

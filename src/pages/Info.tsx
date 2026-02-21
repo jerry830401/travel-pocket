@@ -9,10 +9,8 @@ import {
   Plane,
   ExternalLink,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 const Info = () => {
-  const { t } = useTranslation();
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [items, setItems] = useState<InfoItem[]>([]);
 
@@ -42,7 +40,7 @@ const Info = () => {
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900 min-h-full">
       <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4 px-1">
-        {t("info.title")}
+        資訊
       </h2>
       <div className="space-y-3">
         {items.map((item) => (
@@ -79,7 +77,7 @@ const Info = () => {
 
         {items.length === 0 && (
           <div className="text-center py-10 text-gray-500 dark:text-gray-400">
-            {t("info.loading_info")}
+            載入資訊中...
           </div>
         )}
       </div>

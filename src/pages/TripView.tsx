@@ -2,13 +2,10 @@ import { useEffect, useState } from "react";
 import { Outlet, NavLink, useParams, Link } from "react-router-dom";
 import type { Trip } from "../types";
 import { Calendar, Store, Info, ChevronLeft } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeToggle } from "../components/ThemeToggle";
 import clsx from "clsx";
 
 const TripView = () => {
-  const { t } = useTranslation();
   const { tripId } = useParams();
   const [trip, setTrip] = useState<Trip | null>(null);
 
@@ -25,7 +22,7 @@ const TripView = () => {
   if (!trip)
     return (
       <div className="p-10 text-center text-gray-500 dark:text-gray-400">
-        {t("common.loading")}
+        載入中...
       </div>
     );
 
@@ -43,7 +40,6 @@ const TripView = () => {
           {trip.name}
         </h1>
         <ThemeToggle />
-        <LanguageSwitcher />
       </header>
 
       {/* Content Area */}
@@ -73,9 +69,7 @@ const TripView = () => {
                     isActive && "scale-110",
                   )}
                 />
-                <span className="text-[10px] font-medium">
-                  {t("nav.schedule")}
-                </span>
+                <span className="text-[10px] font-medium">行程</span>
               </>
             )}
           </NavLink>
@@ -98,9 +92,7 @@ const TripView = () => {
                     isActive && "scale-110",
                   )}
                 />
-                <span className="text-[10px] font-medium">
-                  {t("nav.shops")}
-                </span>
+                <span className="text-[10px] font-medium">店舖</span>
               </>
             )}
           </NavLink>
@@ -123,7 +115,7 @@ const TripView = () => {
                     isActive && "scale-110",
                   )}
                 />
-                <span className="text-[10px] font-medium">{t("nav.info")}</span>
+                <span className="text-[10px] font-medium">資訊</span>
               </>
             )}
           </NavLink>
