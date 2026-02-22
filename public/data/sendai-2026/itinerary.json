@@ -192,6 +192,7 @@
         "endTime": "14:00",
         "googleMapLink": "",
         "description": [
+          "搭乘「JR仙石線」至「JR中野榮站」，步行約15分鐘or搭乘接駁巴士約7分鐘",
           "成人 ¥2400，小學生 ¥1200， 4歳以上小学生以下 ¥700，4歲未滿免費"
         ]
       },
@@ -203,7 +204,7 @@
         "startTime": "14:30",
         "endTime": "16:00",
         "googleMapLink": "https://maps.app.goo.gl/BGMLbqrezAdi8SgA8",
-        "description": ["啤酒工廠免費參觀但須先網路預約"]
+        "description": ["啤酒工廠免費參觀，但須先網路預約"]
       }
     ]
   },
@@ -269,6 +270,33 @@
         "category": "ship",
         "startTime": "16:30",
         "endTime": "",
+        "googleMapLink": "",
+        "description": ""
+      }
+    ]
+  },
+  {
+    "id": "6",
+    "day": "6",
+    "date": "2026-03-19",
+    "items": [
+      {
+        "id": "6-1",
+        "title": "仙台車站",
+        "location": "Sendai Station",
+        "category": "train",
+        "startTime": "08:45",
+        "endTime": "09:00",
+        "googleMapLink": "",
+        "description": ["搭乘\"仙台地下鐵東西線(往八木動物公園)\""]
+      },
+      {
+        "id": "6-2",
+        "title": "八木山動物公園",
+        "location": "八木山動物公園",
+        "category": "sightseeing",
+        "startTime": "09:30",
+        "endTime": "14:00",
         "googleMapLink": "",
         "description": ""
       }

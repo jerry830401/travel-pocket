@@ -1,9 +1,13 @@
 [
   {
     "id": "tigerair",
-    "title": "交通",
+    "title": "出入境",
     "icon": "Plane",
     "links": [
+      {
+        "label": "Visit Japan Web",
+        "url": "https://www.vjw.digital.go.jp"
+      },
       {
         "label": "虎航 - 搭乘須知",
         "url": "https://www.tigerairtw.com/zh-tw/welcome-on-board/boarding"
@@ -15,7 +19,7 @@
     ]
   },
   {
-    "id": "tigerair",
+    "id": "landmark",
     "title": "景點",
     "icon": "Landmark",
     "links": [
@@ -46,6 +50,10 @@
       {
         "label": "貓島攻略 - 田代島",
         "url": "https://komijian.com/jp-miyagi-tashirojima/"
+      },
+      {
+        "label": "八木山動物公園",
+        "url": "https://www.city.sendai.jp/zoo/"
       }
     ]
   }
