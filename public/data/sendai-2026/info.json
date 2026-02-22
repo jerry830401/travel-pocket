@@ -24,6 +24,10 @@
     "icon": "Landmark",
     "links": [
       {
+        "label": "金蛇水神社",
+        "url": "http://japan.miyagi-kankou.or.jp.t.afh.hp.transer.com/theme/detail.php?id=21414"
+      },
+      {
         "label": "藏王狐狸村",
         "url": "https://livejapan.com/zh-tw/in-tohoku/in-pref-miyagi/in-miyagi-suburbs/article-a3000044/"
       },
@@ -32,12 +36,12 @@
         "url": "https://zaoropeway.co.jp/winter/cn.php"
       },
       {
-        "label": "金蛇水神社",
-        "url": "http://japan.miyagi-kankou.or.jp.t.afh.hp.transer.com/theme/detail.php?id=21414"
-      },
-      {
         "label": "最上川遊船",
         "url": "https://lovetogo.tw/201802-tohoku/mogamigawa/index.php#%E8%88%B9%E7%8F%AD"
+      },
+      {
+        "label": "銀山溫泉",
+        "url": "https://www.gltjp.com/zh-hant/article/item/20403/"
       },
       {
         "label": "仙台海洋森林水族館",
