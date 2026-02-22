@@ -17,6 +17,14 @@
   },
   {
     "id": "s3",
+    "name": "善治郎 仙台站前本店",
+    "location": "たんや善治郎 駅前本店",
+    "tags": ["飲食"],
+    "businessHours": "11:00 - 23:00",
+    "googleMapLink": "https://maps.app.goo.gl/KqS25iyix3XF9unQ6"
+  },
+  {
+    "id": "s4",
     "name": "鳥貴族 - 仙台站西口店",
     "location": "仙台駅西口",
     "tags": ["飲食"],
@@ -24,7 +32,7 @@
     "googleMapLink": "https://maps.app.goo.gl/1QFbBmYJjr5Trvzd9"
   },
   {
-    "id": "s4",
+    "id": "s5",
     "name": "UNIQLO - 仙台駅店",
     "location": "AER 3F",
     "tags": ["衣服"],
@@ -32,7 +40,7 @@
     "googleMapLink": "https://maps.app.goo.gl/26URRMi22JXneaXy6"
   },
   {
-    "id": "s5",
+    "id": "s6",
     "name": "Yodobashi Camera - 仙台店",
     "location": "Yodobashi Camera sendai",
     "tags": ["家電", "玩具", "轉蛋"],
@@ -40,7 +48,7 @@
     "googleMapLink": "https://maps.app.goo.gl/jddzwcgMgXvPzzNj9"
   },
   {
-    "id": "s6",
+    "id": "s7",
     "name": "唐吉訶德 - 仙台站西口店",
     "location": "ドン・キホーテ 仙台駅西口本店",
     "tags": ["藥妝", "玩具", "轉蛋"],
@@ -48,7 +56,7 @@
     "googleMapLink": "https://maps.app.goo.gl/BKWH6Bq3n3AXRCYu7"
   },
   {
-    "id": "s7",
+    "id": "s8",
     "name": "LOFT - 仙台店",
     "location": "LOFT 仙台店",
     "tags": ["玩具", "轉蛋"],
@@ -56,11 +64,67 @@
     "googleMapLink": "https://maps.app.goo.gl/iAcDpd9gWdh4WBTU7"
   },
   {
-    "id": "s8",
+    "id": "s9",
     "name": "GU - 友都八喜仙台店",
     "location": "ジーユー ヨドバシ仙台店",
     "tags": ["衣服"],
     "businessHours": "10:00 - 21:00",
     "googleMapLink": "https://maps.app.goo.gl/icg959ucKj7qG52j8"
+  },
+  {
+    "id": "s10",
+    "name": "博多牛腸鍋 大山 仙台店",
+    "location": "博多牛腸鍋 大山 仙台店",
+    "tags": ["飲食"],
+    "businessHours": "11:00 - 23:00",
+    "googleMapLink": "https://maps.app.goo.gl/pJaww1sH9aubCagN6"
+  },
+  {
+    "id": "s11",
+    "name": "Namaskar(印度料理)",
+    "location": "Namaskar",
+    "tags": ["飲食", "蔬食"],
+    "businessHours": "11:00 - 22:00",
+    "googleMapLink": "https://maps.app.goo.gl/afzBaeKS1kAubMGR9"
+  },
+  {
+    "id": "s12",
+    "name": "INDIAN Restaurant TAJ-21(印度料理)",
+    "location": "INDIAN Restaurant TAJ-21",
+    "tags": ["飲食", "蔬食"],
+    "businessHours": "11:00 - 23:00",
+    "googleMapLink": "https://maps.app.goo.gl/FdosUX3pbwhGtui77"
+  },
+  {
+    "id": "s13",
+    "name": "Sizzler - 仙台站店",
+    "location": "Sizzler 仙台站店",
+    "tags": ["飲食", "蔬食"],
+    "businessHours": "10:00 - 05:00",
+    "googleMapLink": "https://maps.app.goo.gl/qjh8ZfqFYUCCe4oPA"
+  },
+  {
+    "id": "s14",
+    "name": "C-pla 仙台中央通り店",
+    "location": "C-pla 仙台中央通り店",
+    "tags": ["轉蛋"],
+    "businessHours": "10:00 - 22:00",
+    "googleMapLink": "https://maps.app.goo.gl/WZxZ9tBdtfUMNCV89"
+  },
+  {
+    "id": "s15",
+    "name": "Hakubotan",
+    "location": "Hakubotan",
+    "tags": ["轉蛋", "玩具"],
+    "businessHours": "11:00 - 20:00",
+    "googleMapLink": "https://maps.app.goo.gl/vVWonjCsjExbBiy28"
+  },
+  {
+    "id": "s16",
+    "name": "あゆみBOOKS 仙台一番町店",
+    "location": "あゆみBOOKS 仙台一番町店",
+    "tags": ["轉蛋"],
+    "businessHours": "10:00 - 19:00",
+    "googleMapLink": "https://maps.app.goo.gl/Tbn9XPjcVrAM6o986"
   }
 ]
