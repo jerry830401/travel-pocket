@@ -134,11 +134,11 @@
       },
       {
         "id": "3-2",
-        "title": "最上川遊船",
+        "title": "最上川遊船 - 古口港 & 午餐",
         "location": "最上峡芭蕉ライン観光",
         "category": "sightseeing",
         "startTime": "10:30",
-        "endTime": "12:50",
+        "endTime": "",
         "googleMapLink": "",
         "description": [
           "大人單程 ¥3000，往返 ¥4720",
@@ -148,20 +148,30 @@
       },
       {
         "id": "3-3",
-        "title": "銀山溫泉",
-        "location": "銀山温泉",
+        "title": "最上川遊船 - 草薙港",
+        "location": "最上峡芭蕉ライン観光㈱ 草薙港",
         "category": "sightseeing",
-        "startTime": "14:00",
-        "endTime": "16:00",
-        "googleMapLink": "",
+        "startTime": "",
+        "endTime": "12:00",
+        "googleMapLink": "https://maps.app.goo.gl/XWpwXfNvo3WwNknJ8",
         "description": ""
       },
       {
         "id": "3-4",
+        "title": "銀山溫泉",
+        "location": "銀山温泉",
+        "category": "sightseeing",
+        "startTime": "13:30",
+        "endTime": "16:30",
+        "googleMapLink": "",
+        "description": ""
+      },
+      {
+        "id": "3-5",
         "title": "住宿報到",
         "location": "仙台蒙特埃馬酒店",
         "category": "hotel",
-        "startTime": "18:00",
+        "startTime": "18:30",
         "endTime": "",
         "googleMapLink": "",
         "description": ""
