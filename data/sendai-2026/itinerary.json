@@ -76,28 +76,18 @@
         "title": "白石市(午餐)",
         "location": "白石温麺専門店 つりがね庵",
         "category": "food",
-        "startTime": "10:30",
-        "endTime": "11:30",
+        "startTime": "11:00",
+        "endTime": "12:00",
         "googleMapLink": "",
         "description": ""
       },
       {
         "id": "2-4",
-        "title": "藏王狐狸村",
-        "location": "宮城蔵王キツネ村",
-        "category": "sightseeing",
-        "startTime": "12:00",
-        "endTime": "13:00",
-        "googleMapLink": "",
-        "description": ["中學生以上 ¥1000，未滿則免費"]
-      },
-      {
-        "id": "2-5",
         "title": "藏王纜車-山麓站",
         "location": "蔵王ロープウェイ 蔵王山麓駅",
         "category": "sightseeing",
-        "startTime": "14:50",
-        "endTime": "16:00",
+        "startTime": "14:00",
+        "endTime": "15:30",
         "googleMapLink": "https://maps.app.goo.gl/51JHDwxyxyzWZ8P27",
         "description": [
           "「藏王山麓站」->「樹冰高原站」，成人 ¥2200，小學生 ¥1100",
@@ -106,11 +96,11 @@
         ]
       },
       {
-        "id": "2-6",
+        "id": "2-5",
         "title": "住宿報到",
         "location": "ほほえみの宿滝の湯",
         "category": "hotel",
-        "startTime": "17:00",
+        "startTime": "16:30",
         "endTime": "",
         "googleMapLink": "",
         "description": ""
