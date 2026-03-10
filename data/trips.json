@@ -4,13 +4,15 @@
     "name": "仙台",
     "startDate": "2026-03-14",
     "endDate": "2026-03-21",
-    "coverImage": "https://placehold.co/600x400?text=Sendai"
+    "coverImage": "https://placehold.co/600x400?text=Sendai",
+    "snapshot": "data/sendai-2026/snapshot.jpg"
   },
   {
     "id": "kyushu-2024",
     "name": "福岡-熊本",
     "startDate": "2024-09-27",
     "endDate": "2024-10-04",
-    "coverImage": "https://placehold.co/600x400?text=Kyushu"
+    "coverImage": "https://placehold.co/600x400?text=Kyushu",
+    "snapshot": "data/kyushu-2024/snapshot.jpg"
   }
 ]
