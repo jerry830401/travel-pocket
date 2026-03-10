@@ -48,7 +48,11 @@ const Home = () => {
             >
               <div className="h-48 bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
                 <img
-                  src={trip.coverImage}
+                  src={
+                    trip.snapshot
+                      ? `${import.meta.env.BASE_URL}${trip.snapshot}`
+                      : trip.coverImage
+                  }
                   alt={trip.name}
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
                 />

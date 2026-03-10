@@ -73,8 +73,8 @@
       },
       {
         "id": "2-3",
-        "title": "白石市(午餐)",
-        "location": "白石温麺専門店 つりがね庵",
+        "title": "山形市區(午餐)",
+        "location": "山形市區",
         "category": "food",
         "startTime": "11:00",
         "endTime": "12:00",
@@ -86,7 +86,7 @@
         "title": "藏王纜車-山麓站",
         "location": "蔵王ロープウェイ 蔵王山麓駅",
         "category": "sightseeing",
-        "startTime": "14:00",
+        "startTime": "12:30",
         "endTime": "15:30",
         "googleMapLink": "https://maps.app.goo.gl/51JHDwxyxyzWZ8P27",
         "description": [
