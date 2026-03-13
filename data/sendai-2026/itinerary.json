@@ -276,6 +276,23 @@
     ]
   },
   {
+    "id": "5B",
+    "day": "5B",
+    "date": "2026-03-18",
+    "items": [
+      {
+        "id": "5B-1",
+        "title": "松島一日遊",
+        "location": "松島",
+        "category": "sightseeing",
+        "startTime": "09:00",
+        "endTime": "",
+        "googleMapLink": "",
+        "description": ""
+      }
+    ]
+  },
+  {
     "id": "6",
     "day": "6",
     "date": "2026-03-19",
@@ -306,7 +323,18 @@
     "id": "7",
     "day": "7",
     "date": "2026-03-20",
-    "items": []
+    "items": [
+      {
+        "id": "7-1",
+        "title": "仙台泉PREMIUM OUTLETS",
+        "location": "仙台泉プレミアム・アウトレット",
+        "category": "sightseeing",
+        "startTime": "10:00",
+        "endTime": "",
+        "googleMapLink": "",
+        "description": []
+      }
+    ]
   },
   {
     "id": "8",
