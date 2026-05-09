@@ -21,7 +21,9 @@
       "Bash(pnpm lint *)",
       "Bash(pnpm test:e2e)",
       "Bash(git rm *)",
-      "Bash(pnpm build *)"
+      "Bash(pnpm build *)",
+      "Bash(Get-ChildItem -Path \"f:\\\\Projects\\\\travel-pokect\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ],
     "additionalDirectories": [
       "f:\\Projects\\travel-pokect\\.claude"

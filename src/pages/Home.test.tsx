@@ -34,6 +34,7 @@ describe("Home", () => {
     localStorage.clear();
     document.documentElement.classList.remove("dark");
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
       json: () => Promise.resolve(mockTrips),
     } as Response);
   });
@@ -43,10 +44,11 @@ describe("Home", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Travel Pocket");
   });
 
-  it("資料載入前顯示載入中文字", () => {
+  it("資料載入前顯示 skeleton 佔位符", () => {
     vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
     render(<Home />, { wrapper: Wrapper });
-    expect(screen.getByText("載入中...")).toBeInTheDocument();
+    const skeletons = document.querySelectorAll(".skeleton");
+    expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it("fetch 後渲染旅行卡片", async () => {

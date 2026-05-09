@@ -17,13 +17,17 @@ const Shops = () => {
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [shops, setShops] = useState<Shop[]>([]);
   const [selectedTag, setSelectedTag] = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (!trip) return;
     fetch(`${import.meta.env.BASE_URL}data/${trip.id}/shops.json`)
-      .then((r) => r.json())
-      .then(setShops);
-  }, [trip]);
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((data: Shop[]) => { setShops(data); setLoading(false); })
+      .catch(() => { setError(true); setLoading(false); });
+  }, [trip, retry]);
 
   const tags = useMemo(() => {
     const all = new Set(shops.flatMap((s) => s.tags));
@@ -42,40 +46,79 @@ const Shops = () => {
         className="sticky top-0 z-10 flex gap-2 overflow-x-auto scrollbar-hide px-3.5 py-2.5"
         style={{ background: "var(--paper)", borderBottom: "1.5px dashed var(--rule)" }}
       >
-        {tags.map((tag) => {
-          const on = tag === selectedTag;
-          return (
-            <button
-              key={tag}
-              onClick={() => setSelectedTag(tag)}
-              className="font-hand font-bold whitespace-nowrap shrink-0 transition-all duration-150"
-              style={{
-                fontSize: "1.05rem",
-                padding: "3px 13px",
-                borderRadius: 18,
-                border: "1.5px solid var(--ink)",
-                background: on ? "var(--ink)" : "transparent",
-                color: on ? "var(--paper)" : "var(--ink)",
-                cursor: "pointer",
-                transform: on ? "rotate(-1.5deg)" : "none",
-                boxShadow: on ? "2px 2px 0 var(--blue)" : "none",
-              }}
-            >
-              {tag === "All" ? "全部" : tag}
-            </button>
-          );
-        })}
+        {loading ? (
+          [...Array(4)].map((_, i) => (
+            <div key={i} className="skeleton shrink-0" style={{ width: 64, height: 30, borderRadius: 18 }} />
+          ))
+        ) : (
+          tags.map((tag) => {
+            const on = tag === selectedTag;
+            return (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(tag)}
+                className="font-hand font-bold whitespace-nowrap shrink-0 transition-all duration-150"
+                style={{
+                  fontSize: "1.05rem",
+                  padding: "3px 13px",
+                  borderRadius: 18,
+                  border: "1.5px solid var(--ink)",
+                  background: on ? "var(--ink)" : "transparent",
+                  color: on ? "var(--paper)" : "var(--ink)",
+                  cursor: "pointer",
+                  transform: on ? "rotate(-1.5deg)" : "none",
+                  boxShadow: on ? "2px 2px 0 var(--blue)" : "none",
+                }}
+              >
+                {tag === "All" ? "全部" : tag}
+              </button>
+            );
+          })
+        )}
       </div>
 
       {/* List */}
       <div style={{ padding: "14px 18px 84px" }}>
-        {filtered.length === 0 && (
+        {/* Error state */}
+        {error && (
+          <div className="flex flex-col items-center justify-center py-16 gap-4 font-hand" style={{ color: "var(--ink-soft)" }}>
+            <span style={{ fontSize: "2.4rem" }}>😵</span>
+            <p style={{ fontSize: "1.1rem" }}>店家資訊載入失敗</p>
+            <button
+              onClick={() => { setLoading(true); setError(false); setRetry((r) => r + 1); }}
+              className="font-hand font-bold"
+              style={{
+                padding: "6px 22px", borderRadius: 18,
+                border: "1.5px solid var(--ink)",
+                background: "var(--ink)", color: "var(--paper)",
+                fontSize: "1rem", cursor: "pointer",
+              }}
+            >
+              重試
+            </button>
+          </div>
+        )}
+
+        {/* Skeleton cards */}
+        {loading && (
+          [...Array(4)].map((_, i) => (
+            <div key={i} className="skeleton" style={{
+              height: 110,
+              borderRadius: 10,
+              marginBottom: 14,
+              transform: i % 2 === 0 ? "rotate(-.3deg)" : "rotate(.4deg)",
+            }} />
+          ))
+        )}
+
+        {/* Shop cards */}
+        {!loading && !error && filtered.length === 0 && (
           <div className="text-center py-10 font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.2rem" }}>
             找不到相關店家
           </div>
         )}
 
-        {filtered.map((shop, i) => {
+        {!loading && !error && filtered.map((shop, i) => {
           const rot = i % 2 === 0 ? "rotate(-.3deg)" : "rotate(.4deg)";
           return (
             <div
