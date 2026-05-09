@@ -1,1 +1,0 @@
-if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/travel-pocket/sw.js', { scope: '/travel-pocket/' })})}
