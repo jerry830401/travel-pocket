@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"f:\\\\Projects\\\\travel-pokect\" -Depth 0)",
+      "Bash(Select-Object Name, FullName)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(gunzip -c \"/mnt/c/Users/Jerry/.claude/projects/f--Projects-travel-pokect/f2ed8464-d410-4d54-abdf-de2753eb7527/tool-results/webfetch-1778337705414-8f4xi8.bin\")",
+      "Read(//tmp/**)",
+      "Read(//mnt/c/Users/Jerry/.claude/projects/f--Projects-travel-pokect/f2ed8464-d410-4d54-abdf-de2753eb7527/tool-results/**)",
+      "Read(//mnt/c/Users/Jerry/.claude/projects/f--Projects-travel-pokect/f2ed8464-d410-4d54-abdf-de2753eb7527/**)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Recurse -Path .\\\\src -Filter *.ts*)",
+      "Bash(Select-Object FullName)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm test *)",
+      "Bash(npx playwright *)",
+      "PowerShell(ls \"$env:LOCALAPPDATA\\\\ms-playwright\" 2>&1)",
+      "Bash(mkdir -p \"f:/Projects/travel-pokect/.claude/commands\")",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm test:e2e)",
+      "Bash(git rm *)"
+    ],
+    "additionalDirectories": [
+      "f:\\Projects\\travel-pokect\\.claude"
+    ]
+  }
+}

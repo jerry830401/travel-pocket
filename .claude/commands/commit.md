@@ -27,8 +27,8 @@ pnpm test:e2e
 
 ### 4. 建立 Commit（三關全過後才執行）
 
-1. 執行 `git status` 確認哪些檔案要提交。
-2. 詢問使用者確認暫存範圍（或直接暫存使用者指定的檔案）。
+1. 執行 `git add -A`，將所有新增、修改、刪除的檔案全部暫存。
+2. 執行 `git status` 確認暫存內容。
 3. 根據 diff 內容，以**繁體中文**撰寫 commit message，格式：
    ```
    <type>: <簡短描述>
@@ -38,7 +38,7 @@ pnpm test:e2e
    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
    ```
    type 使用：`feat` / `fix` / `refactor` / `test` / `ci` / `docs` / `chore`
-4. 執行 `git commit`。
+4. 執行 `git commit -m "..."`。
 
 ## 中止時的訊息範本
 > ❌ **[關卡名稱] 未通過，已中止 commit。**

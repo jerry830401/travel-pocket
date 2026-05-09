@@ -18,6 +18,12 @@ pnpm build        # TypeScript check + production Vite build (outputs to dist/)
 pnpm lint         # Run ESLint
 pnpm preview      # Preview production build locally
 pnpm deploy       # Build then push dist/ to GitHub Pages via gh-pages
+
+pnpm test              # Run Vitest unit tests (single run)
+pnpm test:watch        # Run Vitest in watch mode
+pnpm test:coverage     # Run Vitest with V8 coverage report
+pnpm test:e2e          # Run Playwright E2E tests (auto-starts dev server)
+pnpm test:e2e:ui       # Run Playwright E2E tests with interactive UI
 ```
 
 ## Architecture
@@ -54,6 +60,16 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 | `lucide-react` | Category icons mapped by `ItineraryItem.category` string |
 | `clsx` | Conditional className construction |
 | `vite-plugin-pwa` | Service worker, offline caching (7-day expiry for JSON data) |
+
+### Testing
+
+| Layer | Tool | Location |
+|---|---|---|
+| Unit / component | Vitest + React Testing Library + jsdom | `src/**/*.test.tsx` |
+| E2E | Playwright (Chromium only) | `e2e/*.spec.ts` |
+
+- Vitest setup file is at `src/test/setup.ts` — patches `matchMedia` for jsdom and runs `cleanup` after each test
+- E2E tests run against the dev server at `http://localhost:5173/travel-pocket/`; Playwright starts it automatically via `webServer` in `playwright.config.ts`
 
 ### Build Notes
 
