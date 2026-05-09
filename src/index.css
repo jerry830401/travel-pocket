@@ -2,43 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design Tokens ── */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --bg:         #f6f1e7;
+  --paper:      #fdfaf2;
+  --paper-2:    #f4ecdc;
+  --ink:        #2b2622;
+  --ink-soft:   #6b5e4a;
+  --ink-faint:  #a89a82;
+  --rule:       #cfc5b0;
+  --dot:        rgba(60,50,30,0.20);
+  --red:        #c8533a;
+  --red-soft:   #f5dcd3;
+  --blue:       #3a6a9a;
+  --blue-soft:  #d8e3ee;
+  --green:      #6c8a4a;
+  --green-soft: #dde6ce;
+  --yel:        #e8b948;
+  --yel-soft:   #f7e8b8;
+  --purple:     #7a5ea0;
+  --purple-soft:#e0d6ec;
+  --pink:       #c8689a;
+  --pink-soft:  #f2dbe5;
+}
+html.dark {
+  --bg:         #1d1812;
+  --paper:      #2a2419;
+  --paper-2:    #322b1f;
+  --ink:        #ede4d2;
+  --ink-soft:   #b8aa92;
+  --ink-faint:  #7a6e5a;
+  --rule:       #4a4232;
+  --dot:        rgba(220,200,150,0.10);
+  --red:        #e8806c;
+  --red-soft:   #4a2820;
+  --blue:       #6a9bc8;
+  --blue-soft:  #1f3548;
+  --green:      #9ab874;
+  --green-soft: #2c3a1e;
+  --yel:        #e8c876;
+  --yel-soft:   #4a3818;
+  --purple:     #b39ad0;
+  --purple-soft:#322a48;
+  --pink:       #d896b4;
+  --pink-soft:  #4a2c3a;
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%; /* Fallback */
-  height: 100dvh;
-  overflow: hidden; /* Prevent body scroll */
-  overscroll-behavior-y: none; /* Prevent pull-to-refresh / rubber-banding */
-}
-
-/* Safe area utilities for PWA / notch devices */
-@layer utilities {
-  .pt-safe-home {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
-  }
-  .pt-safe {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
-  }
-}
-
-body {
-  min-width: 320px;
-  background-color: #f3f4f6;
-  /* gray-100 matches App */
-}
-
-.dark body {
-  background-color: #030712; /* gray-950 */
-}
-
-#root {
-  height: 100%;
-  width: 100%;
+html, body {
+  margin: 0; padding: 0; width: 100%;
+  height: 100%; height: 100dvh;
   overflow: hidden;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 320px;
+}
+body {
+  font-family: 'Klee One', 'Zen Kurenaido', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #e9e2cd;
+  color: var(--ink);
+}
+html.dark body { background: #15110b; }
+#root { height: 100%; width: 100%; overflow: hidden; }
+
+/* ── Background patterns ── */
+.dot-grid-bg {
+  background:
+    radial-gradient(var(--dot) 1px, transparent 1.4px) 0 0 / 16px 16px,
+    var(--bg);
+}
+.lined-bg {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 27px,
+      color-mix(in srgb, var(--rule) 55%, transparent) 27px 28px
+    ),
+    var(--paper);
+}
+
+/* ── Category sticker colors ── */
+.st-tr { background: var(--blue-soft);   color: var(--blue); }
+.st-ht { background: var(--pink-soft);   color: #7a3a5a; }
+.st-sg { background: var(--green-soft);  color: var(--green); }
+.st-fd { background: var(--red-soft);    color: var(--red); }
+.st-pl { background: var(--purple-soft); color: var(--purple); }
+.st-xx { background: var(--paper-2);     color: var(--ink-soft); }
+html.dark .st-ht { color: var(--pink); }
+
+/* ── Scrollbar ── */
+.scrollbar-hide { scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* ── Safe area ── */
+@layer utilities {
+  .pt-safe-home { padding-top: calc(env(safe-area-inset-top, 0px) + 2.5rem); }
+  .pt-safe      { padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem); }
 }

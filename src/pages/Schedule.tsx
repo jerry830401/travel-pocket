@@ -1,276 +1,335 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, ItineraryDay, ItineraryItem } from "../types";
-import {
-  MapPin,
-  Clock,
-  Landmark,
-  Bus,
-  MoreHorizontal,
-  X,
-  PlaneLanding,
-  TrainFront,
-  ExternalLink as ExternalLinkWrapper,
-  Hotel,
-  PlaneTakeoff,
-  CarFront,
-  UtensilsCrossed,
-  Ship,
-} from "lucide-react";
-import { format, parse, differenceInMinutes } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import clsx from "clsx";
+
+/* Category sticker data */
+const CATS: Record<string, { g: string; cls: string; l: string }> = {
+  planeTakeoff: { g: "✈",  cls: "st-pl", l: "出發" },
+  planeLanding: { g: "🛬", cls: "st-pl", l: "抵達" },
+  train:        { g: "🚆", cls: "st-tr", l: "交通" },
+  bus:          { g: "🚌", cls: "st-tr", l: "巴士" },
+  ship:         { g: "⛴",  cls: "st-tr", l: "渡船" },
+  car:          { g: "🚗", cls: "st-tr", l: "自駕" },
+  hotel:        { g: "住",  cls: "st-ht", l: "住宿" },
+  food:         { g: "食",  cls: "st-fd", l: "餐廳" },
+  sightseeing:  { g: "⛩",  cls: "st-sg", l: "景點" },
+};
+const CDEF = { g: "·", cls: "st-xx", l: "其他" };
+function gc(k: string) { return CATS[k] ?? CDEF; }
+
+function toMins(s: string | undefined) {
+  if (!s) return null;
+  const [h, m] = s.split(":").map(Number);
+  return h * 60 + m;
+}
+function gapLabel(diff: number | null) {
+  if (!diff || diff <= 0) return null;
+  const h = Math.floor(diff / 60), m = diff % 60;
+  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
+}
+function dateBig(d: string) { const [,mo,dy] = d.split("-"); return `${mo} / ${dy}`; }
+function weekday(d: string) {
+  return ["SUN","MON","TUE","WED","THU","FRI","SAT"][new Date(d).getDay()];
+}
+
+const PIN_SVG = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+  </svg>
+);
+const PIN_L = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+  </svg>
+);
+const CLK = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+  </svg>
+);
+const EXT = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+  </svg>
+);
 
 const Schedule = () => {
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [days, setDays] = useState<ItineraryDay[]>([]);
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
+  const [dayIdx, setDayIdx] = useState(0);
+  const [selectedItem, setSelectedItem] = useState<{ item: ItineraryItem; day: ItineraryDay } | null>(null);
 
   useEffect(() => {
     if (!trip) return;
     fetch(`${import.meta.env.BASE_URL}data/${trip.id}/itinerary.json`)
-      .then((res) => res.json())
-      .then((data) => setDays(data));
+      .then((r) => r.json())
+      .then(setDays);
   }, [trip]);
 
-  const currentDay = days[selectedDayIndex];
-
-  const getCategoryStyles = (category: string) => {
-    const styles = {
-      planeTakeoff: {
-        icon: PlaneTakeoff,
-        color: "bg-orange-100 text-orange-600",
-      },
-      planeLanding: {
-        icon: PlaneLanding,
-        color: "bg-orange-100 text-orange-600",
-      },
-      train: { icon: TrainFront, color: "bg-orange-100 text-orange-600" },
-      bus: { icon: Bus, color: "bg-orange-100 text-orange-600" },
-      car: { icon: CarFront, color: "bg-orange-100 text-orange-600" },
-      ship: { icon: Ship, color: "bg-orange-100 text-orange-600" },
-      hotel: { icon: Hotel, color: "bg-blue-100 text-blue-600" },
-      food: { icon: UtensilsCrossed, color: "bg-orange-100 text-orange-600" },
-      sightseeing: { icon: Landmark, color: "bg-green-100 text-green-600" },
-    };
-    const config = styles[category as keyof typeof styles] || {
-      icon: MoreHorizontal,
-      color: "bg-gray-100 text-gray-600",
-    };
-    const Icon = config.icon;
-    return { icon: <Icon className="w-5 h-5" />, color: config.color };
-  };
+  const currentDay = days[dayIdx];
 
   return (
-    <div className="relative min-h-full pb-20">
-      {/* Day Selector */}
-      {days.length > 1 && (
-        <div className="sticky top-0 bg-white dark:bg-gray-800 z-10 border-b border-gray-100 dark:border-gray-700 flex overflow-x-auto p-2 gap-2 scrollbar-hide">
-          {days.map((d, index) => (
+    <div className="relative min-h-full lined-bg">
+      {/* Day bar */}
+      {days.length > 0 && (
+        <div
+          className="sticky top-0 z-10 flex gap-2 overflow-x-auto scrollbar-hide px-3.5 py-3"
+          style={{ background: "var(--paper)", borderBottom: "1.5px dashed var(--rule)" }}
+        >
+          {days.map((d, i) => (
             <button
               key={d.id}
-              onClick={() => setSelectedDayIndex(index)}
-              className={clsx(
-                "px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors",
-                index === selectedDayIndex
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600",
-              )}
+              onClick={() => setDayIdx(i)}
+              className="font-hand font-bold whitespace-nowrap shrink-0 transition-all duration-150"
+              style={{
+                fontSize: "1.05rem",
+                padding: "4px 14px",
+                borderRadius: 18,
+                border: "1.5px solid var(--ink)",
+                background: i === dayIdx ? "var(--ink)" : "transparent",
+                color: i === dayIdx ? "var(--paper)" : "var(--ink)",
+                cursor: "pointer",
+                transform: i === dayIdx ? "rotate(-2deg)" : "none",
+                boxShadow: i === dayIdx ? "2px 2px 0 var(--red)" : "none",
+              }}
             >
-              Day {d.day}{" "}
-              <span className="text-xs opacity-80 ml-1">
-                ({format(new Date(d.date), "MM/dd")})
-              </span>
+              <span>Day {d.day}</span>
+              <span style={{ fontSize: ".85em", opacity: .65, marginLeft: 4 }}>{d.date.slice(5)}</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* Timeline */}
-      <div className="p-4 space-y-4">
-        {currentDay?.items.map((item, index) => {
-          const nextItem = currentDay.items[index + 1];
-          let gapMinutes = 0;
-          if (nextItem) {
-            const currentEnd = parse(item.endTime, "HH:mm", new Date());
-            const nextStart = parse(nextItem.startTime, "HH:mm", new Date());
-            gapMinutes = differenceInMinutes(nextStart, currentEnd);
-          }
+      {/* Date stamp */}
+      {currentDay && (
+        <div className="flex items-baseline gap-3.5 px-4 pt-3.5 pb-1.5">
+          <span className="font-hand font-bold" style={{ fontSize: "2.4rem", letterSpacing: "-0.01em", lineHeight: 1, color: "var(--ink)" }}>
+            {dateBig(currentDay.date)}
+          </span>
+          <span className="font-mono" style={{ fontSize: ".7rem", color: "var(--ink-soft)", letterSpacing: ".18em" }}>
+            {weekday(currentDay.date)} · DAY {currentDay.day}
+          </span>
+        </div>
+      )}
+
+      {/* Items */}
+      <div style={{ padding: "8px 18px 84px" }}>
+        {!currentDay && (
+          <div className="text-center py-10 font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.2rem" }}>
+            載入行程中...
+          </div>
+        )}
+
+        {currentDay?.items.map((item, j) => {
+          const cat = gc(item.category);
+          const next = currentDay.items[j + 1];
+          const gap = next ? gapLabel((toMins(next.startTime) ?? 0) - (toMins(item.endTime) ?? 0)) : null;
+          const rot = j % 2 === 0 ? "rotate(-.4deg)" : "rotate(.4deg)";
 
           return (
             <div key={item.id}>
               <div
-                onClick={() => setSelectedItem(item)}
-                className="flex bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 active:scale-[0.98] transition-transform cursor-pointer"
+                onClick={() => setSelectedItem({ item, day: currentDay })}
+                className="cursor-pointer transition-all duration-200"
+                style={{
+                  position: "relative",
+                  background: "var(--paper)",
+                  border: "1px solid color-mix(in srgb, var(--rule) 55%, transparent)",
+                  borderRadius: 10,
+                  padding: "14px 16px",
+                  marginBottom: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  boxShadow: "0 1px 2px rgba(40,30,20,.06),2px 2px 0 var(--rule)",
+                  transform: rot,
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.transform = "rotate(0) translateY(-2px)";
+                  el.style.boxShadow = "3px 3px 0 var(--red),0 4px 12px rgba(40,30,20,.1)";
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.transform = rot;
+                  el.style.boxShadow = "0 1px 2px rgba(40,30,20,.06),2px 2px 0 var(--rule)";
+                }}
               >
-                {/* Time Column */}
-                <div className="flex flex-col items-center mr-4 w-12 pt-1">
-                  <span className="text-sm font-bold text-gray-800 dark:text-gray-100">
-                    {item.startTime}
-                  </span>
-                  <div className="h-full w-0.5 bg-gray-100 dark:bg-gray-700 my-2"></div>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {item.endTime}
-                  </span>
+                {/* Time */}
+                <div className="shrink-0 text-center" style={{ minWidth: 54 }}>
+                  <div className="font-mono font-semibold" style={{ fontSize: ".95rem", color: "var(--ink)", letterSpacing: ".02em" }}>
+                    {item.startTime || "—"}
+                  </div>
+                  {item.endTime && (
+                    <>
+                      <div style={{ width: 1.5, height: 14, background: "var(--rule)", margin: "5px auto" }} />
+                      <div className="font-mono" style={{ fontSize: ".72rem", color: "var(--ink-soft)" }}>{item.endTime}</div>
+                    </>
+                  )}
                 </div>
-
-                {/* Content */}
-                <div className="flex-1">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-bold text-gray-800 dark:text-gray-100">
-                      {item.title}
-                    </h3>
-                    <span
-                      className={clsx(
-                        "p-1.5 rounded-full",
-                        getCategoryStyles(item.category).color,
-                      )}
-                    >
-                      {getCategoryStyles(item.category).icon}
-                    </span>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="font-hand font-bold truncate" style={{ fontSize: "1.4rem", lineHeight: 1.1, color: "var(--ink)" }}>
+                    {item.title}
                   </div>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mb-1">
-                    <MapPin className="w-3.5 h-3.5 mr-1" />
-                    <span className="line-clamp-1">{item.location}</span>
+                  <div className="flex items-center gap-1.5 mt-0.5" style={{ fontSize: ".78rem", color: "var(--ink-soft)" }}>
+                    <span style={{ color: "var(--ink-faint)", flexShrink: 0 }}>{PIN_SVG}</span>
+                    <span className="truncate">{item.location}</span>
                   </div>
+                </div>
+                {/* Sticker */}
+                <div
+                  className={`shrink-0 flex items-center justify-center font-hand font-bold ${cat.cls}`}
+                  style={{ width: 38, height: 38, borderRadius: "50%", fontSize: 18, transform: "rotate(-4deg)", boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,.5),0 1.5px 3px rgba(40,30,20,.18)" }}
+                >
+                  {cat.g}
                 </div>
               </div>
 
-              {/* Gap Indicator */}
-              {gapMinutes > 0 && (
-                <div className="flex items-center justify-center py-2">
-                  <div className="text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-full flex items-center">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {Math.floor(gapMinutes / 60) > 0
-                      ? `交通 / 自由時間 ${Math.floor(gapMinutes / 60)}小時 ${gapMinutes % 60}分`
-                      : `交通 / 自由時間 ${gapMinutes % 60}分`}
-                  </div>
+              {/* Gap pill */}
+              {gap && (
+                <div className="flex justify-center py-0.5 mb-3">
+                  <span
+                    className="font-hand inline-flex items-center gap-1.5"
+                    style={{
+                      fontSize: ".95rem", color: "var(--ink-soft)",
+                      padding: "1px 12px",
+                      border: "1.5px dashed var(--rule)",
+                      borderRadius: 999,
+                      background: "var(--paper)",
+                      transform: "rotate(-1deg)",
+                    }}
+                  >
+                    {CLK} {gap}
+                  </span>
                 </div>
               )}
             </div>
           );
         })}
-
-        {!currentDay && (
-          <div className="text-center text-gray-400 dark:text-gray-500 py-10">
-            載入行程中...
-          </div>
-        )}
       </div>
 
-      {/* Detail Sheet */}
+      {/* Bottom Sheet */}
       <AnimatePresence>
         {selectedItem && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedItem(null)}
-              className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+              className="fixed inset-0 z-40"
+              style={{ background: "rgba(40,30,20,.4)", backdropFilter: "blur(5px)" }}
             />
-
-            {/* Sheet */}
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white dark:bg-gray-800 rounded-t-3xl z-50 p-6 shadow-2xl overflow-hidden"
-              style={{ maxHeight: "85vh" }}
+              className="fixed bottom-0 left-0 right-0 mx-auto z-50 overflow-y-auto scrollbar-hide"
+              style={{
+                maxWidth: 480,
+                maxHeight: "85vh",
+                background: "var(--paper)",
+                borderRadius: "24px 24px 0 0",
+                borderTop: "2px dashed var(--rule)",
+                boxShadow: "0 -8px 40px rgba(40,30,20,.18)",
+                padding: "22px 22px 28px",
+              }}
             >
-              <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-6" />
-
+              {/* Handle */}
+              <div style={{ width: 48, height: 4, background: "var(--rule)", borderRadius: 2, margin: "0 auto 18px" }} />
+              {/* Close */}
               <button
                 onClick={() => setSelectedItem(null)}
-                className="absolute top-4 right-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+                className="absolute top-[18px] right-[18px] flex items-center justify-center font-hand"
+                style={{
+                  width: 32, height: 32, borderRadius: "50%",
+                  border: "1.5px solid var(--ink)",
+                  background: "var(--paper)", color: "var(--ink)", fontSize: 18,
+                  cursor: "pointer",
+                }}
               >
-                <X className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                ×
               </button>
 
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <span
-                      className={clsx(
-                        "p-2 rounded-lg",
-                        getCategoryStyles(selectedItem.category).color,
-                      )}
-                    >
-                      {getCategoryStyles(selectedItem.category).icon}
-                    </span>
-                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400 capitalize">
-                      {selectedItem.category}
-                    </span>
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-50 leading-tight">
-                    {selectedItem.title}
-                  </h2>
+              {/* Eyebrow */}
+              <div className="flex items-center gap-2.5 mb-2">
+                <div
+                  className={`flex items-center justify-center font-hand font-bold ${gc(selectedItem.item.category).cls}`}
+                  style={{ width: 30, height: 30, borderRadius: "50%", fontSize: 14 }}
+                >
+                  {gc(selectedItem.item.category).g}
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-xl">
-                    <span className="text-xs text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider">
-                      時間
-                    </span>
-                    <div className="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-0.5">
-                      {selectedItem.startTime} - {selectedItem.endTime}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-xl">
-                    <span className="text-xs text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider">
-                      日期
-                    </span>
-                    <div className="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-0.5">
-                      Day {currentDay?.day}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    地點
-                  </h3>
-                  <a
-                    href={
-                      selectedItem.googleMapLink ||
-                      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedItem.location)}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors group"
-                  >
-                    <div className="flex items-center text-blue-700 dark:text-blue-300">
-                      <MapPin className="w-5 h-5 mr-3" />
-                      <span className="font-medium">
-                        {selectedItem.location}
-                      </span>
-                    </div>
-                    <ExternalLinkWrapper className="w-4 h-4 text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-300" />
-                  </a>
-                </div>
-
-                {selectedItem.description && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      說明
-                    </h3>
-                    <div className="text-gray-600 dark:text-gray-300 leading-relaxed bg-gray-50 dark:bg-gray-700 p-4 rounded-xl">
-                      {Array.isArray(selectedItem.description) ? (
-                        <ol className="list-decimal list-inside space-y-1">
-                          {selectedItem.description.map((desc, i) => (
-                            <li key={i}>{desc}</li>
-                          ))}
-                        </ol>
-                      ) : (
-                        selectedItem.description
-                      )}
-                    </div>
-                  </div>
-                )}
+                <span className="font-mono uppercase" style={{ fontSize: ".7rem", color: "var(--ink-soft)", letterSpacing: ".2em" }}>
+                  {gc(selectedItem.item.category).l}
+                </span>
               </div>
+
+              {/* Title */}
+              <h2 className="font-hand font-bold mb-4" style={{ fontSize: "2rem", letterSpacing: "-0.01em", lineHeight: 1.1, color: "var(--ink)" }}>
+                {selectedItem.item.title}
+              </h2>
+
+              {/* Grid */}
+              <div className="grid grid-cols-2 gap-2.5 mb-4">
+                <div style={{ padding: "12px 14px", background: "var(--paper-2)", border: "1px dashed var(--rule)", borderRadius: 8 }}>
+                  <div className="font-mono uppercase" style={{ fontSize: ".65rem", letterSpacing: ".18em", color: "var(--ink-soft)" }}>時間</div>
+                  <div className="font-hand font-bold mt-0.5" style={{ fontSize: "1.3rem", lineHeight: 1.2, color: "var(--ink)" }}>
+                    {selectedItem.item.startTime || "—"}{selectedItem.item.endTime ? ` – ${selectedItem.item.endTime}` : ""}
+                  </div>
+                </div>
+                <div style={{ padding: "12px 14px", background: "var(--paper-2)", border: "1px dashed var(--rule)", borderRadius: 8 }}>
+                  <div className="font-mono uppercase" style={{ fontSize: ".65rem", letterSpacing: ".18em", color: "var(--ink-soft)" }}>第幾天</div>
+                  <div className="font-hand font-bold mt-0.5" style={{ fontSize: "1.3rem", lineHeight: 1.2, color: "var(--ink)" }}>
+                    Day {selectedItem.day.day}
+                  </div>
+                </div>
+              </div>
+
+              {/* Map */}
+              <div className="font-mono uppercase mb-2" style={{ fontSize: ".65rem", letterSpacing: ".18em", color: "var(--ink-soft)" }}>地點資訊</div>
+              <a
+                href={
+                  selectedItem.item.googleMapLink ||
+                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedItem.item.location)}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-hand font-bold flex items-center justify-between mb-4 transition-all duration-150 hover:-translate-y-0.5"
+                style={{
+                  padding: "14px 16px",
+                  background: "var(--red-soft)",
+                  border: "1.5px dashed var(--red)",
+                  borderRadius: 10,
+                  color: "var(--red)",
+                  textDecoration: "none",
+                  fontSize: "1.1rem",
+                }}
+              >
+                <span className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <span style={{ flexShrink: 0, color: "var(--red)" }}>{PIN_L}</span>
+                  <span className="truncate">{selectedItem.item.location}</span>
+                </span>
+                <span>{EXT}</span>
+              </a>
+
+              {/* Notes */}
+              {selectedItem.item.description && (Array.isArray(selectedItem.item.description) ? selectedItem.item.description.length > 0 : true) && (
+                <>
+                  <div className="font-mono uppercase mb-2" style={{ fontSize: ".65rem", letterSpacing: ".18em", color: "var(--ink-soft)" }}>備忘錄</div>
+                  <div style={{ background: "var(--paper-2)", border: "1px dashed var(--rule)", borderRadius: 10, padding: "14px 18px", fontSize: ".9rem", color: "var(--ink-soft)", lineHeight: 1.7 }}>
+                    {Array.isArray(selectedItem.item.description) ? (
+                      <ol className="list-decimal list-inside space-y-1">
+                        {selectedItem.item.description.map((d, i) => <li key={i}>{d}</li>)}
+                      </ol>
+                    ) : (
+                      selectedItem.item.description
+                    )}
+                  </div>
+                </>
+              )}
             </motion.div>
           </>
         )}

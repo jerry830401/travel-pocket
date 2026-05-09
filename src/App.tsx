@@ -10,10 +10,11 @@ function App() {
   return (
     <ThemeProvider>
       <HashRouter>
-        {/* Background for Desktop */}
-        <div className="bg-gray-100 dark:bg-gray-950 h-full w-full flex justify-center overflow-hidden">
-          {/* Mobile View Container */}
-          <div className="w-full max-w-[480px] bg-white dark:bg-gray-900 h-full shadow-xl relative flex flex-col">
+        <div className="h-full w-full flex justify-center overflow-hidden" style={{ background: '#e9e2cd' }}>
+          <div
+            className="w-full max-w-[480px] h-full relative flex flex-col overflow-hidden"
+            style={{ background: 'var(--bg)', boxShadow: '0 0 80px rgba(40,30,20,.18)' }}
+          >
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/trip/:tripId" element={<TripView />}>

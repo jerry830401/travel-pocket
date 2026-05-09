@@ -6,7 +6,13 @@ export default {
         "./src/**/*.{js,ts,jsx,tsx}",
     ],
     theme: {
-        extend: {},
+        extend: {
+            fontFamily: {
+                hand: ["'Caveat'", "'Klee One'", 'cursive'],
+                body: ["'Klee One'", "'Zen Kurenaido'", 'sans-serif'],
+                mono: ["'DM Mono'", 'ui-monospace', 'monospace'],
+            },
+        },
     },
     plugins: [
         require('@tailwindcss/typography'),

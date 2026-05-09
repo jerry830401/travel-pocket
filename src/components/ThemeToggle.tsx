@@ -1,4 +1,3 @@
-import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface ThemeToggleProps {
@@ -11,17 +10,22 @@ export const ThemeToggle = ({ className }: ThemeToggleProps) => {
   return (
     <button
       onClick={toggleTheme}
-      className={
-        className ??
-        "p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300"
-      }
+      className={className}
       aria-label="Toggle dark mode"
+      style={
+        className
+          ? undefined
+          : {
+              width: 36, height: 36, borderRadius: "50%",
+              border: "1.5px dashed var(--ink)",
+              background: "transparent", color: "var(--ink)",
+              fontFamily: "'Caveat', cursive", fontSize: 18,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+            }
+      }
     >
-      {theme === "dark" ? (
-        <Sun className="w-5 h-5" />
-      ) : (
-        <Moon className="w-5 h-5" />
-      )}
+      {theme === "dark" ? "☀" : "☾"}
     </button>
   );
 };
