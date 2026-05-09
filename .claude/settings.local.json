@@ -20,7 +20,8 @@
       "Bash(mkdir -p \"f:/Projects/travel-pokect/.claude/commands\")",
       "Bash(pnpm lint *)",
       "Bash(pnpm test:e2e)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(pnpm build *)"
     ],
     "additionalDirectories": [
       "f:\\Projects\\travel-pokect\\.claude"

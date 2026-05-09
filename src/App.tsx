@@ -5,10 +5,12 @@ import Schedule from "./pages/Schedule";
 import Shops from "./pages/Shops";
 import Info from "./pages/Info";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { UpdatePrompt } from "./components/UpdatePrompt";
 
 function App() {
   return (
     <ThemeProvider>
+      <UpdatePrompt />
       <HashRouter>
         <div className="h-full w-full flex justify-center overflow-hidden" style={{ background: '#e9e2cd' }}>
           <div
