@@ -6,17 +6,20 @@ import { useTheme } from "../contexts/ThemeContext";
 const TripView = () => {
   const { tripId } = useParams();
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [error, setError] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/trips.json`)
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data: Trip[]) => {
         const found = data.find((t) => t.id === tripId);
         if (found) setTrip(found);
-      });
+        else setError(true);
+      })
+      .catch(() => setError(true));
   }, [tripId]);
 
   // Redirect to schedule if on base trip path
@@ -32,10 +35,31 @@ const TripView = () => {
     ? "info"
     : "schedule";
 
+  if (error)
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 font-hand" style={{ color: "var(--ink-soft)" }}>
+        <span style={{ fontSize: "2.4rem" }}>😵</span>
+        <p style={{ fontSize: "1.1rem" }}>找不到這趟旅行</p>
+      </div>
+    );
+
   if (!trip)
     return (
-      <div className="p-10 text-center font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.2rem" }}>
-        載入中...
+      <div className="flex flex-col h-full" style={{ background: "var(--bg)" }}>
+        <div
+          className="shrink-0 px-4 pb-3 pt-safe z-30 flex items-center gap-3"
+          style={{ background: "var(--paper)", borderBottom: "1.5px dashed var(--rule)" }}
+        >
+          <div className="skeleton" style={{ width: 34, height: 34, borderRadius: "50%" }} />
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            <div className="skeleton" style={{ height: 28, width: "55%", borderRadius: 4 }} />
+            <div className="skeleton" style={{ height: 16, width: "40%", borderRadius: 4 }} />
+          </div>
+          <div className="skeleton" style={{ width: 36, height: 36, borderRadius: "50%" }} />
+        </div>
+        <div className="flex-1 flex items-center justify-center font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.1rem" }}>
+          載入中...
+        </div>
       </div>
     );
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, ItineraryDay, ItineraryItem } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,6 +32,10 @@ function dateBig(d: string) { const [,mo,dy] = d.split("-"); return `${mo} / ${d
 function weekday(d: string) {
   return ["SUN","MON","TUE","WED","THU","FRI","SAT"][new Date(d).getDay()];
 }
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
 
 const PIN_SVG = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -54,55 +58,165 @@ const EXT = (
   </svg>
 );
 
+const dayVariants = {
+  enter: (dir: number) => ({ x: dir * 48, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir * -48, opacity: 0 }),
+};
+
 const Schedule = () => {
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [dayIdx, setDayIdx] = useState(0);
+  const [direction, setDirection] = useState(1);
   const [selectedItem, setSelectedItem] = useState<{ item: ItineraryItem; day: ItineraryDay } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const dayBarRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const today = getTodayStr();
 
   useEffect(() => {
     if (!trip) return;
     fetch(`${import.meta.env.BASE_URL}data/${trip.id}/itinerary.json`)
-      .then((r) => r.json())
-      .then(setDays);
-  }, [trip]);
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((data: ItineraryDay[]) => {
+        setDays(data);
+        const ti = data.findIndex((d) => d.date === today);
+        if (ti >= 0) setDayIdx(ti);
+        setLoading(false);
+      })
+      .catch(() => { setError(true); setLoading(false); });
+  }, [trip, retry]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-scroll active day pill into view
+  useEffect(() => {
+    const bar = dayBarRef.current;
+    if (!bar || !days.length) return;
+    const btn = bar.children[dayIdx] as HTMLElement | undefined;
+    btn?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }, [dayIdx, days.length]);
+
+  const goToDay = (idx: number) => {
+    setDirection(idx >= dayIdx ? 1 : -1);
+    setDayIdx(idx);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (selectedItem) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(dx) > Math.abs(dy) * 1.5 && Math.abs(dx) > 50) {
+      if (dx < 0 && dayIdx < days.length - 1) goToDay(dayIdx + 1);
+      else if (dx > 0 && dayIdx > 0) goToDay(dayIdx - 1);
+    }
+  };
+
+  const todayIdx = days.findIndex((d) => d.date === today);
   const currentDay = days[dayIdx];
 
+  const handleRetry = () => {
+    setLoading(true);
+    setError(false);
+    setRetry((r) => r + 1);
+  };
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center py-20 gap-4 font-hand" style={{ color: "var(--ink-soft)" }}>
+      <span style={{ fontSize: "2.4rem" }}>😵</span>
+      <p style={{ fontSize: "1.1rem" }}>行程載入失敗</p>
+      <button
+        onClick={handleRetry}
+        className="font-hand font-bold"
+        style={{
+          padding: "6px 22px", borderRadius: 18,
+          border: "1.5px solid var(--ink)",
+          background: "var(--ink)", color: "var(--paper)",
+          fontSize: "1rem", cursor: "pointer",
+        }}
+      >
+        重試
+      </button>
+    </div>
+  );
+
   return (
-    <div className="relative min-h-full lined-bg">
+    <div
+      className="relative min-h-full lined-bg"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Day bar */}
-      {days.length > 0 && (
+      <div
+        className="sticky top-0 z-10 flex items-center"
+        style={{ background: "var(--paper)", borderBottom: "1.5px dashed var(--rule)" }}
+      >
         <div
-          className="sticky top-0 z-10 flex gap-2 overflow-x-auto scrollbar-hide px-3.5 py-3"
-          style={{ background: "var(--paper)", borderBottom: "1.5px dashed var(--rule)" }}
+          ref={dayBarRef}
+          className="flex gap-2 overflow-x-auto scrollbar-hide flex-1 px-3.5 py-3"
         >
-          {days.map((d, i) => (
-            <button
-              key={d.id}
-              onClick={() => setDayIdx(i)}
-              className="font-hand font-bold whitespace-nowrap shrink-0 transition-all duration-150"
-              style={{
-                fontSize: "1.05rem",
-                padding: "4px 14px",
-                borderRadius: 18,
-                border: "1.5px solid var(--ink)",
-                background: i === dayIdx ? "var(--ink)" : "transparent",
-                color: i === dayIdx ? "var(--paper)" : "var(--ink)",
-                cursor: "pointer",
-                transform: i === dayIdx ? "rotate(-2deg)" : "none",
-                boxShadow: i === dayIdx ? "2px 2px 0 var(--red)" : "none",
-              }}
-            >
-              <span>Day {d.day}</span>
-              <span style={{ fontSize: ".85em", opacity: .65, marginLeft: 4 }}>{d.date.slice(5)}</span>
-            </button>
-          ))}
+          {loading
+            ? [...Array(5)].map((_, i) => (
+                <div key={i} className="skeleton shrink-0" style={{ width: 76, height: 32, borderRadius: 18 }} />
+              ))
+            : days.map((d, i) => (
+                <button
+                  key={d.id}
+                  onClick={() => goToDay(i)}
+                  className="font-hand font-bold whitespace-nowrap shrink-0 transition-all duration-150"
+                  style={{
+                    fontSize: "1.05rem",
+                    padding: "4px 14px",
+                    borderRadius: 18,
+                    border: "1.5px solid var(--ink)",
+                    background: i === dayIdx ? "var(--ink)" : "transparent",
+                    color: i === dayIdx ? "var(--paper)" : "var(--ink)",
+                    cursor: "pointer",
+                    transform: i === dayIdx ? "rotate(-2deg)" : "none",
+                    boxShadow: i === dayIdx ? "2px 2px 0 var(--red)" : "none",
+                  }}
+                >
+                  <span>Day {d.day}</span>
+                  <span style={{ fontSize: ".85em", opacity: .65, marginLeft: 4 }}>{d.date.slice(5)}</span>
+                </button>
+              ))
+          }
         </div>
-      )}
+        {/* 今天 quick-jump button */}
+        {!loading && todayIdx >= 0 && todayIdx !== dayIdx && (
+          <button
+            onClick={() => goToDay(todayIdx)}
+            className="shrink-0 font-hand font-bold mr-3"
+            style={{
+              padding: "4px 12px",
+              borderRadius: 18,
+              border: "1.5px dashed var(--red)",
+              background: "var(--red-soft)",
+              color: "var(--red)",
+              fontSize: ".9rem",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            今天
+          </button>
+        )}
+      </div>
 
       {/* Date stamp */}
-      {currentDay && (
+      {loading ? (
+        <div className="flex items-baseline gap-3.5 px-4 pt-3.5 pb-1.5">
+          <div className="skeleton" style={{ width: 120, height: 38, borderRadius: 6 }} />
+          <div className="skeleton" style={{ width: 88, height: 14, borderRadius: 4 }} />
+        </div>
+      ) : currentDay && (
         <div className="flex items-baseline gap-3.5 px-4 pt-3.5 pb-1.5">
           <span className="font-hand font-bold" style={{ fontSize: "2.4rem", letterSpacing: "-0.01em", lineHeight: 1, color: "var(--ink)" }}>
             {dateBig(currentDay.date)}
@@ -114,101 +228,125 @@ const Schedule = () => {
       )}
 
       {/* Items */}
-      <div style={{ padding: "8px 18px 84px" }}>
-        {!currentDay && (
-          <div className="text-center py-10 font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.2rem" }}>
-            載入行程中...
-          </div>
-        )}
-
-        {currentDay?.items.map((item, j) => {
-          const cat = gc(item.category);
-          const next = currentDay.items[j + 1];
-          const gap = next ? gapLabel((toMins(next.startTime) ?? 0) - (toMins(item.endTime) ?? 0)) : null;
-          const rot = j % 2 === 0 ? "rotate(-.4deg)" : "rotate(.4deg)";
-
-          return (
-            <div key={item.id}>
-              <div
-                onClick={() => setSelectedItem({ item, day: currentDay })}
-                className="cursor-pointer transition-all duration-200"
-                style={{
-                  position: "relative",
-                  background: "var(--paper)",
-                  border: "1px solid color-mix(in srgb, var(--rule) 55%, transparent)",
-                  borderRadius: 10,
-                  padding: "14px 16px",
-                  marginBottom: 12,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  boxShadow: "0 1px 2px rgba(40,30,20,.06),2px 2px 0 var(--rule)",
-                  transform: rot,
-                }}
-                onMouseEnter={e => {
-                  const el = e.currentTarget as HTMLElement;
-                  el.style.transform = "rotate(0) translateY(-2px)";
-                  el.style.boxShadow = "3px 3px 0 var(--red),0 4px 12px rgba(40,30,20,.1)";
-                }}
-                onMouseLeave={e => {
-                  const el = e.currentTarget as HTMLElement;
-                  el.style.transform = rot;
-                  el.style.boxShadow = "0 1px 2px rgba(40,30,20,.06),2px 2px 0 var(--rule)";
-                }}
-              >
-                {/* Time */}
-                <div className="shrink-0 text-center" style={{ minWidth: 54 }}>
-                  <div className="font-mono font-semibold" style={{ fontSize: ".95rem", color: "var(--ink)", letterSpacing: ".02em" }}>
-                    {item.startTime || "—"}
-                  </div>
-                  {item.endTime && (
-                    <>
-                      <div style={{ width: 1.5, height: 14, background: "var(--rule)", margin: "5px auto" }} />
-                      <div className="font-mono" style={{ fontSize: ".72rem", color: "var(--ink-soft)" }}>{item.endTime}</div>
-                    </>
-                  )}
-                </div>
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="font-hand font-bold truncate" style={{ fontSize: "1.4rem", lineHeight: 1.1, color: "var(--ink)" }}>
-                    {item.title}
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5" style={{ fontSize: ".78rem", color: "var(--ink-soft)" }}>
-                    <span style={{ color: "var(--ink-faint)", flexShrink: 0 }}>{PIN_SVG}</span>
-                    <span className="truncate">{item.location}</span>
-                  </div>
-                </div>
-                {/* Sticker */}
-                <div
-                  className={`shrink-0 flex items-center justify-center font-hand font-bold ${cat.cls}`}
-                  style={{ width: 38, height: 38, borderRadius: "50%", fontSize: 18, transform: "rotate(-4deg)", boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,.5),0 1.5px 3px rgba(40,30,20,.18)" }}
-                >
-                  {cat.g}
-                </div>
+      {loading ? (
+        <div style={{ padding: "8px 18px 84px" }}>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="skeleton" style={{
+              height: 70,
+              borderRadius: 10,
+              marginBottom: 12,
+              transform: i % 2 === 0 ? "rotate(-.4deg)" : "rotate(.4deg)",
+            }} />
+          ))}
+        </div>
+      ) : (
+        <AnimatePresence mode="wait" initial={false} custom={direction}>
+          <motion.div
+            key={dayIdx}
+            custom={direction}
+            variants={dayVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            style={{ padding: "8px 18px 84px" }}
+          >
+            {!currentDay && (
+              <div className="text-center py-10 font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.2rem" }}>
+                無行程資料
               </div>
+            )}
 
-              {/* Gap pill */}
-              {gap && (
-                <div className="flex justify-center py-0.5 mb-3">
-                  <span
-                    className="font-hand inline-flex items-center gap-1.5"
+            {currentDay?.items.map((item, j) => {
+              const cat = gc(item.category);
+              const next = currentDay.items[j + 1];
+              const gap = next ? gapLabel((toMins(next.startTime) ?? 0) - (toMins(item.endTime) ?? 0)) : null;
+              const rot = j % 2 === 0 ? "rotate(-.4deg)" : "rotate(.4deg)";
+
+              return (
+                <div key={item.id}>
+                  <div
+                    onClick={() => setSelectedItem({ item, day: currentDay })}
+                    className="cursor-pointer transition-all duration-200"
                     style={{
-                      fontSize: ".95rem", color: "var(--ink-soft)",
-                      padding: "1px 12px",
-                      border: "1.5px dashed var(--rule)",
-                      borderRadius: 999,
+                      position: "relative",
                       background: "var(--paper)",
-                      transform: "rotate(-1deg)",
+                      border: "1px solid color-mix(in srgb, var(--rule) 55%, transparent)",
+                      borderRadius: 10,
+                      padding: "14px 16px",
+                      marginBottom: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      boxShadow: "0 1px 2px rgba(40,30,20,.06),2px 2px 0 var(--rule)",
+                      transform: rot,
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLElement;
+                      el.style.transform = "rotate(0) translateY(-2px)";
+                      el.style.boxShadow = "3px 3px 0 var(--red),0 4px 12px rgba(40,30,20,.1)";
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLElement;
+                      el.style.transform = rot;
+                      el.style.boxShadow = "0 1px 2px rgba(40,30,20,.06),2px 2px 0 var(--rule)";
                     }}
                   >
-                    {CLK} {gap}
-                  </span>
+                    {/* Time */}
+                    <div className="shrink-0 text-center" style={{ minWidth: 54 }}>
+                      <div className="font-mono font-semibold" style={{ fontSize: ".95rem", color: "var(--ink)", letterSpacing: ".02em" }}>
+                        {item.startTime || "—"}
+                      </div>
+                      {item.endTime && (
+                        <>
+                          <div style={{ width: 1.5, height: 14, background: "var(--rule)", margin: "5px auto" }} />
+                          <div className="font-mono" style={{ fontSize: ".72rem", color: "var(--ink-soft)" }}>{item.endTime}</div>
+                        </>
+                      )}
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-hand font-bold truncate" style={{ fontSize: "1.4rem", lineHeight: 1.1, color: "var(--ink)" }}>
+                        {item.title}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5" style={{ fontSize: ".78rem", color: "var(--ink-soft)" }}>
+                        <span style={{ color: "var(--ink-faint)", flexShrink: 0 }}>{PIN_SVG}</span>
+                        <span className="truncate">{item.location}</span>
+                      </div>
+                    </div>
+                    {/* Sticker */}
+                    <div
+                      className={`shrink-0 flex items-center justify-center font-hand font-bold ${cat.cls}`}
+                      style={{ width: 38, height: 38, borderRadius: "50%", fontSize: 18, transform: "rotate(-4deg)", boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,.5),0 1.5px 3px rgba(40,30,20,.18)" }}
+                    >
+                      {cat.g}
+                    </div>
+                  </div>
+
+                  {/* Gap pill */}
+                  {gap && (
+                    <div className="flex justify-center py-0.5 mb-3">
+                      <span
+                        className="font-hand inline-flex items-center gap-1.5"
+                        style={{
+                          fontSize: ".95rem", color: "var(--ink-soft)",
+                          padding: "1px 12px",
+                          border: "1.5px dashed var(--rule)",
+                          borderRadius: 999,
+                          background: "var(--paper)",
+                          transform: "rotate(-1deg)",
+                        }}
+                      >
+                        {CLK} {gap}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </motion.div>
+        </AnimatePresence>
+      )}
 
       {/* Bottom Sheet */}
       <AnimatePresence>

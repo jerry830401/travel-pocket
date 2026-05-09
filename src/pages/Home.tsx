@@ -23,14 +23,17 @@ function calcDays(s: string, e: string) {
 
 const Home = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/trips.json`)
-      .then((r) => r.json())
-      .then(setTrips)
-      .catch(console.error);
-  }, []);
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((data: Trip[]) => { setTrips(data); setLoading(false); })
+      .catch(() => { setError(true); setLoading(false); });
+  }, [retry]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -89,13 +92,54 @@ const Home = () => {
           旅行筆記
         </div>
 
-        {trips.length === 0 && (
-          <div className="text-center py-10 font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.2rem" }}>
-            載入中...
+        {/* Error state */}
+        {error && (
+          <div className="flex flex-col items-center justify-center py-16 gap-4 font-hand" style={{ color: "var(--ink-soft)" }}>
+            <span style={{ fontSize: "2.4rem" }}>😵</span>
+            <p style={{ fontSize: "1.1rem" }}>旅行清單載入失敗</p>
+            <button
+              onClick={() => { setLoading(true); setError(false); setRetry((r) => r + 1); }}
+              className="font-hand font-bold"
+              style={{
+                padding: "6px 22px", borderRadius: 18,
+                border: "1.5px solid var(--ink)",
+                background: "var(--ink)", color: "var(--paper)",
+                fontSize: "1rem", cursor: "pointer",
+              }}
+            >
+              重試
+            </button>
           </div>
         )}
 
-        {trips.map((trip, i) => {
+        {/* Skeleton cards */}
+        {loading && (
+          <>
+            {[...Array(2)].map((_, i) => (
+              <div
+                key={i}
+                className="block mb-8"
+                style={{ transform: i % 2 === 0 ? "rotate(-1.2deg)" : "rotate(1deg)" }}
+              >
+                <div
+                  style={{
+                    background: "var(--paper)",
+                    padding: "10px 10px 18px",
+                    borderRadius: 6,
+                    boxShadow: "0 4px 14px rgba(40,30,20,.12)",
+                  }}
+                >
+                  <div className="skeleton" style={{ height: 170, borderRadius: 4 }} />
+                  <div className="skeleton" style={{ height: 32, width: "65%", borderRadius: 4, marginTop: 14 }} />
+                  <div className="skeleton" style={{ height: 18, width: "45%", borderRadius: 4, marginTop: 8 }} />
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Trip cards */}
+        {!loading && !error && trips.map((trip, i) => {
           const w = WASHI[i % WASHI.length];
           const baseRotate = i % 2 === 0 ? "rotate(-1.2deg)" : "rotate(1deg)";
           return (
@@ -137,6 +181,7 @@ const Home = () => {
                   <img
                     src={trip.snapshot ? `${import.meta.env.BASE_URL}${trip.snapshot}` : trip.coverImage}
                     alt={trip.name}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                   />
                   <div aria-hidden style={{

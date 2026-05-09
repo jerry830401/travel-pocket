@@ -98,3 +98,14 @@ html.dark .st-ht { color: var(--pink); }
   .pt-safe-home { padding-top: calc(env(safe-area-inset-top, 0px) + 2.5rem); }
   .pt-safe      { padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem); }
 }
+
+/* ── Skeleton loading ── */
+@keyframes sk-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+.skeleton {
+  background: var(--paper-2);
+  border-radius: 6px;
+  animation: sk-pulse 1.6s ease-in-out infinite;
+}
