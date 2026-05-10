@@ -12,7 +12,9 @@
         "startTime": "10:30",
         "endTime": "13:25",
         "googleMapLink": "",
-        "description": ["11:00 ~ 12:45 受理報到"]
+        "description": [
+          "11:00 ~ 12:45 受理報到"
+        ]
       },
       {
         "id": "1-2",
@@ -22,7 +24,9 @@
         "startTime": "17:55",
         "endTime": "18:30",
         "googleMapLink": "",
-        "description": ["搭乘\"仙台機場聯通捷運線\""]
+        "description": [
+          "搭乘\"仙台機場聯通捷運線\""
+        ]
       },
       {
         "id": "1-3",
@@ -204,7 +208,9 @@
         "startTime": "14:30",
         "endTime": "16:00",
         "googleMapLink": "https://maps.app.goo.gl/BGMLbqrezAdi8SgA8",
-        "description": ["啤酒工廠免費參觀，但須先網路預約"]
+        "description": [
+          "啤酒工廠免費參觀，但須先網路預約"
+        ]
       }
     ]
   },
@@ -221,7 +227,9 @@
         "startTime": "07:10",
         "endTime": "07:24",
         "googleMapLink": "",
-        "description": ["搭乘\"JR仙石東北線(快速) - 07:24\""]
+        "description": [
+          "搭乘\"JR仙石東北線(快速) - 07:24\""
+        ]
       },
       {
         "id": "5A-2",
@@ -305,7 +313,9 @@
         "startTime": "08:45",
         "endTime": "09:00",
         "googleMapLink": "",
-        "description": ["搭乘\"仙台地下鐵東西線(往八木動物公園)\""]
+        "description": [
+          "搭乘\"仙台地下鐵東西線(往八木動物公園)\""
+        ]
       },
       {
         "id": "6-2",
@@ -359,7 +369,9 @@
         "startTime": "16:00",
         "endTime": "18:50",
         "googleMapLink": "",
-        "description": ["16:20 ~ 18:05 受理報到"]
+        "description": [
+          "16:20 ~ 18:05 受理報到"
+        ]
       },
       {
         "id": "8-3",
