@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, ItineraryDay, ItineraryItem } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
+import { isDevMode, saveData } from "../hooks/useDataEditor";
+import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
 
 /* Category sticker data */
 const CATS: Record<string, { g: string; cls: string; l: string }> = {
@@ -17,6 +19,11 @@ const CATS: Record<string, { g: string; cls: string; l: string }> = {
 };
 const CDEF = { g: "·", cls: "st-xx", l: "其他" };
 function gc(k: string) { return CATS[k] ?? CDEF; }
+
+const CATEGORY_OPTIONS = [
+  ...Object.entries(CATS).map(([value, { g, l }]) => ({ value, label: `${g} ${l}` })),
+  { value: "other", label: "· 其他" },
+];
 
 function toMins(s: string | undefined) {
   if (!s) return null;
@@ -64,6 +71,65 @@ const dayVariants = {
   exit: (dir: number) => ({ x: dir * -48, opacity: 0 }),
 };
 
+/* ── Draft state for editing an ItineraryItem ── */
+type ItemDraft = {
+  title: string;
+  location: string;
+  category: string;
+  startTime: string;
+  endTime: string;
+  googleMapLink: string;
+  description: string; // textarea; multi-line → string[]
+  thumbnail: string;
+};
+
+function itemToDraft(item: ItineraryItem): ItemDraft {
+  const desc = Array.isArray(item.description)
+    ? item.description.join("\n")
+    : (item.description ?? "");
+  return {
+    title: item.title,
+    location: item.location,
+    category: item.category,
+    startTime: item.startTime,
+    endTime: item.endTime,
+    googleMapLink: item.googleMapLink ?? "",
+    description: desc,
+    thumbnail: item.thumbnail ?? "",
+  };
+}
+
+function draftToItem(draft: ItemDraft, id: string): ItineraryItem {
+  const lines = draft.description.split("\n").map((l) => l.trim()).filter(Boolean);
+  return {
+    id,
+    title: draft.title,
+    location: draft.location,
+    category: draft.category as ItineraryItem["category"],
+    startTime: draft.startTime,
+    endTime: draft.endTime,
+    googleMapLink: draft.googleMapLink || undefined,
+    description: lines.length > 1 ? lines : (lines[0] ?? undefined),
+    thumbnail: draft.thumbnail || undefined,
+  };
+}
+
+const emptyDraft = (): ItemDraft => ({
+  title: "", location: "", category: "sightseeing",
+  startTime: "", endTime: "", googleMapLink: "", description: "", thumbnail: "",
+});
+
+/* ── Draft state for adding an ItineraryDay ── */
+type DayDraft = { date: string; day: number };
+
+function nextDateStr(dateStr: string): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+
 const Schedule = () => {
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [days, setDays] = useState<ItineraryDay[]>([]);
@@ -78,6 +144,17 @@ const Schedule = () => {
   const touchStartY = useRef(0);
   const today = getTodayStr();
 
+  /* Edit state (dev only) */
+  const [editTarget, setEditTarget] = useState<{ item: ItineraryItem; dayId: string } | null>(null);
+  const [addDayId, setAddDayId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ItemDraft>(emptyDraft());
+  const [saving, setSaving] = useState(false);
+
+  /* Day-level edit state (dev only) */
+  const [isAddingDay, setIsAddingDay] = useState(false);
+  const [dayDraft, setDayDraft] = useState<DayDraft>({ date: "", day: 1 });
+  const [savingDay, setSavingDay] = useState(false);
+
   useEffect(() => {
     if (!trip) return;
     fetch(`${import.meta.env.BASE_URL}data/${trip.id}/itinerary.json`)
@@ -91,7 +168,6 @@ const Schedule = () => {
       .catch(() => { setError(true); setLoading(false); });
   }, [trip, retry]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll active day pill into view
   useEffect(() => {
     const bar = dayBarRef.current;
     if (!bar || !days.length) return;
@@ -128,6 +204,104 @@ const Schedule = () => {
     setRetry((r) => r + 1);
   };
 
+  /* ── Edit helpers ── */
+  const openEdit = (item: ItineraryItem, dayId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(itemToDraft(item));
+    setEditTarget({ item, dayId });
+  };
+
+  const openAdd = (dayId: string) => {
+    setDraft(emptyDraft());
+    setAddDayId(dayId);
+  };
+
+  const closeModal = () => {
+    setEditTarget(null);
+    setAddDayId(null);
+  };
+
+  /* ── Day-level helpers ── */
+  const openAddDay = () => {
+    const last = days[days.length - 1];
+    setDayDraft({
+      date: last ? nextDateStr(last.date) : "",
+      day: days.length + 1,
+    });
+    setIsAddingDay(true);
+  };
+
+  const handleDeleteDay = (dayId: string) => {
+    const target = days.find((d) => d.id === dayId);
+    if (!confirm(`確定要刪除「Day ${target?.day}（${target?.date}）」及其所有行程項目？`)) return;
+    const next = days.filter((d) => d.id !== dayId);
+    const newIdx = Math.min(dayIdx, next.length - 1);
+    setDays(next);
+    setDayIdx(Math.max(0, newIdx));
+    saveData(`${trip.id}/itinerary`, next).catch(console.error);
+  };
+
+  const handleSaveDay = async () => {
+    setSavingDay(true);
+    try {
+      const newDay: ItineraryDay = {
+        id: `day-${Date.now()}`,
+        day: dayDraft.day,
+        date: dayDraft.date,
+        items: [],
+      };
+      const next = [...days, newDay].sort((a, b) => a.date.localeCompare(b.date));
+      setDays(next);
+      setDayIdx(next.findIndex((d) => d.id === newDay.id));
+      await saveData(`${trip.id}/itinerary`, next);
+      setIsAddingDay(false);
+    } catch (err) {
+      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
+    } finally {
+      setSavingDay(false);
+    }
+  };
+
+  const handleDelete = (itemId: string, dayId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("確定要刪除這個行程項目？")) return;
+    const next = days.map((d) =>
+      d.id === dayId ? { ...d, items: d.items.filter((it) => it.id !== itemId) } : d
+    );
+    setDays(next);
+    saveData(`${trip.id}/itinerary`, next).catch(console.error);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      let next: ItineraryDay[];
+      if (editTarget) {
+        next = days.map((d) =>
+          d.id === editTarget.dayId
+            ? { ...d, items: d.items.map((it) => it.id === editTarget.item.id ? draftToItem(draft, it.id) : it) }
+            : d
+        );
+      } else if (addDayId) {
+        const newId = `${addDayId}-${Date.now()}`;
+        next = days.map((d) =>
+          d.id === addDayId
+            ? { ...d, items: [...d.items, draftToItem(draft, newId)] }
+            : d
+        );
+      } else {
+        return;
+      }
+      setDays(next);
+      await saveData(`${trip.id}/itinerary`, next);
+      closeModal();
+    } catch (err) {
+      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (error) return (
     <div className="flex flex-col items-center justify-center py-20 gap-4 font-hand" style={{ color: "var(--ink-soft)" }}>
       <span style={{ fontSize: "2.4rem" }}>😵</span>
@@ -147,12 +321,17 @@ const Schedule = () => {
     </div>
   );
 
+  const isEditing = Boolean(editTarget) || Boolean(addDayId);
+  const modalTitle = editTarget ? "編輯行程項目" : "新增行程項目";
+
   return (
     <div
       className="relative min-h-full lined-bg"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      {isDevMode && <DevBanner />}
+
       {/* Day bar */}
       <div
         className="sticky top-0 z-10 flex items-center"
@@ -189,25 +368,29 @@ const Schedule = () => {
               ))
           }
         </div>
-        {/* 今天 quick-jump button */}
-        {!loading && todayIdx >= 0 && todayIdx !== dayIdx && (
-          <button
-            onClick={() => goToDay(todayIdx)}
-            className="shrink-0 font-hand font-bold mr-3"
-            style={{
-              padding: "4px 12px",
-              borderRadius: 18,
-              border: "1.5px dashed var(--red)",
-              background: "var(--red-soft)",
-              color: "var(--red)",
-              fontSize: ".9rem",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            今天
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0 pr-3">
+          {isDevMode && !loading && (
+            <AddBtn onClick={openAddDay} label="新增日" />
+          )}
+          {!loading && todayIdx >= 0 && todayIdx !== dayIdx && (
+            <button
+              onClick={() => goToDay(todayIdx)}
+              className="font-hand font-bold"
+              style={{
+                padding: "4px 12px",
+                borderRadius: 18,
+                border: "1.5px dashed var(--red)",
+                background: "var(--red-soft)",
+                color: "var(--red)",
+                fontSize: ".9rem",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              今天
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Date stamp */}
@@ -217,13 +400,16 @@ const Schedule = () => {
           <div className="skeleton" style={{ width: 88, height: 14, borderRadius: 4 }} />
         </div>
       ) : currentDay && (
-        <div className="flex items-baseline gap-3.5 px-4 pt-3.5 pb-1.5">
+        <div className="flex items-center gap-3.5 px-4 pt-3.5 pb-1.5">
           <span className="font-hand font-bold" style={{ fontSize: "2.4rem", letterSpacing: "-0.01em", lineHeight: 1, color: "var(--ink)" }}>
             {dateBig(currentDay.date)}
           </span>
-          <span className="font-mono" style={{ fontSize: ".7rem", color: "var(--ink-soft)", letterSpacing: ".18em" }}>
+          <span className="font-mono flex-1" style={{ fontSize: ".7rem", color: "var(--ink-soft)", letterSpacing: ".18em" }}>
             {weekday(currentDay.date)} · DAY {currentDay.day}
           </span>
+          {isDevMode && (
+            <DeleteBtn onClick={() => handleDeleteDay(currentDay.id)} />
+          )}
         </div>
       )}
 
@@ -321,6 +507,18 @@ const Schedule = () => {
                     >
                       {cat.g}
                     </div>
+
+                    {/* Dev edit/delete buttons */}
+                    {isDevMode && (
+                      <div
+                        className="absolute flex gap-0.5"
+                        style={{ top: 6, right: 6 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <EditBtn onClick={(e) => openEdit(item, currentDay.id, e)} />
+                        <DeleteBtn onClick={(e) => handleDelete(item.id, currentDay.id, e)} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Gap pill */}
@@ -344,11 +542,18 @@ const Schedule = () => {
                 </div>
               );
             })}
+
+            {/* Add item button (dev only) */}
+            {isDevMode && currentDay && (
+              <div className="flex justify-center pt-2 pb-1">
+                <AddBtn onClick={() => openAdd(currentDay.id)} label="新增行程" />
+              </div>
+            )}
           </motion.div>
         </AnimatePresence>
       )}
 
-      {/* Bottom Sheet */}
+      {/* Bottom Sheet (detail view) */}
       <AnimatePresence>
         {selectedItem && (
           <>
@@ -376,9 +581,7 @@ const Schedule = () => {
                 padding: "22px 22px 28px",
               }}
             >
-              {/* Handle */}
               <div style={{ width: 48, height: 4, background: "var(--rule)", borderRadius: 2, margin: "0 auto 18px" }} />
-              {/* Close */}
               <button
                 onClick={() => setSelectedItem(null)}
                 className="absolute top-[18px] right-[18px] flex items-center justify-center font-hand"
@@ -392,7 +595,6 @@ const Schedule = () => {
                 ×
               </button>
 
-              {/* Eyebrow */}
               <div className="flex items-center gap-2.5 mb-2">
                 <div
                   className={`flex items-center justify-center font-hand font-bold ${gc(selectedItem.item.category).cls}`}
@@ -405,12 +607,10 @@ const Schedule = () => {
                 </span>
               </div>
 
-              {/* Title */}
               <h2 className="font-hand font-bold mb-4" style={{ fontSize: "2rem", letterSpacing: "-0.01em", lineHeight: 1.1, color: "var(--ink)" }}>
                 {selectedItem.item.title}
               </h2>
 
-              {/* Grid */}
               <div className="grid grid-cols-2 gap-2.5 mb-4">
                 <div style={{ padding: "12px 14px", background: "var(--paper-2)", border: "1px dashed var(--rule)", borderRadius: 8 }}>
                   <div className="font-mono uppercase" style={{ fontSize: ".65rem", letterSpacing: ".18em", color: "var(--ink-soft)" }}>時間</div>
@@ -426,7 +626,6 @@ const Schedule = () => {
                 </div>
               </div>
 
-              {/* Map */}
               <div className="font-mono uppercase mb-2" style={{ fontSize: ".65rem", letterSpacing: ".18em", color: "var(--ink-soft)" }}>地點資訊</div>
               <a
                 href={
@@ -453,7 +652,6 @@ const Schedule = () => {
                 <span>{EXT}</span>
               </a>
 
-              {/* Notes */}
               {selectedItem.item.description && (Array.isArray(selectedItem.item.description) ? selectedItem.item.description.length > 0 : true) && (
                 <>
                   <div className="font-mono uppercase mb-2" style={{ fontSize: ".65rem", letterSpacing: ".18em", color: "var(--ink-soft)" }}>備忘錄</div>
@@ -472,6 +670,47 @@ const Schedule = () => {
           </>
         )}
       </AnimatePresence>
+
+      {/* Add day modal (dev only) */}
+      {isDevMode && (
+        <EditModal
+          title="新增日"
+          open={isAddingDay}
+          onClose={() => setIsAddingDay(false)}
+          onSave={handleSaveDay}
+          saving={savingDay}
+        >
+          <FieldInput label="日期" value={dayDraft.date} onChange={(v) => setDayDraft((d) => ({ ...d, date: v }))} type="date" />
+          <FieldInput label="第幾天（Day N）" value={String(dayDraft.day)} onChange={(v) => setDayDraft((d) => ({ ...d, day: parseInt(v) || 1 }))} type="number" />
+        </EditModal>
+      )}
+
+      {/* Edit / Add item modal (dev only) */}
+      {isDevMode && (
+        <EditModal
+          title={modalTitle}
+          open={isEditing}
+          onClose={closeModal}
+          onSave={handleSave}
+          saving={saving}
+        >
+          <FieldInput label="標題" value={draft.title} onChange={(v) => setDraft((d) => ({ ...d, title: v }))} placeholder="行程名稱" />
+          <FieldInput label="地點" value={draft.location} onChange={(v) => setDraft((d) => ({ ...d, location: v }))} placeholder="地點名稱" />
+          <FieldSelect
+            label="類別"
+            value={draft.category}
+            onChange={(v) => setDraft((d) => ({ ...d, category: v }))}
+            options={CATEGORY_OPTIONS}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <FieldInput label="開始時間" value={draft.startTime} onChange={(v) => setDraft((d) => ({ ...d, startTime: v }))} placeholder="HH:MM" type="time" />
+            <FieldInput label="結束時間" value={draft.endTime} onChange={(v) => setDraft((d) => ({ ...d, endTime: v }))} placeholder="HH:MM" type="time" />
+          </div>
+          <FieldInput label="Google Map 連結" value={draft.googleMapLink} onChange={(v) => setDraft((d) => ({ ...d, googleMapLink: v }))} placeholder="https://maps.app.goo.gl/..." type="url" />
+          <FieldTextarea label="備忘錄（每行一筆）" value={draft.description} onChange={(v) => setDraft((d) => ({ ...d, description: v }))} placeholder="備忘事項..." rows={3} />
+          <FieldInput label="縮圖 URL（選填）" value={draft.thumbnail} onChange={(v) => setDraft((d) => ({ ...d, thumbnail: v }))} placeholder="https://..." type="url" />
+        </EditModal>
+      )}
     </div>
   );
 };

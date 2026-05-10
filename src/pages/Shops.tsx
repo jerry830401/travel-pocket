@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, Shop } from "../types";
+import { isDevMode, saveData } from "../hooks/useDataEditor";
+import { EditModal, FieldInput, FieldTags, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
 
 const PIN_SVG = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -13,6 +15,32 @@ const CLK = (
   </svg>
 );
 
+type ShopDraft = {
+  name: string;
+  location: string;
+  tags: string[];
+  businessHours: string;
+  googleMapLink: string;
+};
+
+const emptyDraft = (): ShopDraft => ({
+  name: "", location: "", tags: [], businessHours: "", googleMapLink: "",
+});
+
+function shopToDraft(shop: Shop): ShopDraft {
+  return {
+    name: shop.name,
+    location: shop.location,
+    tags: shop.tags,
+    businessHours: shop.businessHours,
+    googleMapLink: shop.googleMapLink,
+  };
+}
+
+function draftToShop(draft: ShopDraft, id: string): Shop {
+  return { id, ...draft };
+}
+
 const Shops = () => {
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [shops, setShops] = useState<Shop[]>([]);
@@ -20,6 +48,12 @@ const Shops = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
+
+  /* Edit state (dev only) */
+  const [editTarget, setEditTarget] = useState<Shop | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [draft, setDraft] = useState<ShopDraft>(emptyDraft());
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!trip) return;
@@ -39,8 +73,58 @@ const Shops = () => {
     return shops.filter((s) => s.tags.includes(selectedTag));
   }, [shops, selectedTag]);
 
+  /* Edit helpers */
+  const openEdit = (shop: Shop, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(shopToDraft(shop));
+    setEditTarget(shop);
+  };
+
+  const openAdd = () => {
+    setDraft(emptyDraft());
+    setIsAdding(true);
+  };
+
+  const closeModal = () => {
+    setEditTarget(null);
+    setIsAdding(false);
+  };
+
+  const handleDelete = (shopId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("確定要刪除這間店家？")) return;
+    const next = shops.filter((s) => s.id !== shopId);
+    setShops(next);
+    saveData(`${trip.id}/shops`, next).catch(console.error);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      let next: Shop[];
+      if (editTarget) {
+        next = shops.map((s) => s.id === editTarget.id ? draftToShop(draft, s.id) : s);
+      } else {
+        const newId = `shop-${Date.now()}`;
+        next = [...shops, draftToShop(draft, newId)];
+      }
+      setShops(next);
+      await saveData(`${trip.id}/shops`, next);
+      closeModal();
+    } catch (err) {
+      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isEditing = Boolean(editTarget) || isAdding;
+  const modalTitle = editTarget ? "編輯店家" : "新增店家";
+
   return (
     <div style={{ background: "var(--bg)" }}>
+      {isDevMode && <DevBanner />}
+
       {/* Tag bar */}
       <div
         className="sticky top-0 z-10 flex gap-2 overflow-x-auto scrollbar-hide px-3.5 py-2.5"
@@ -79,7 +163,6 @@ const Shops = () => {
 
       {/* List */}
       <div style={{ padding: "14px 18px 84px" }}>
-        {/* Error state */}
         {error && (
           <div className="flex flex-col items-center justify-center py-16 gap-4 font-hand" style={{ color: "var(--ink-soft)" }}>
             <span style={{ fontSize: "2.4rem" }}>😵</span>
@@ -99,7 +182,6 @@ const Shops = () => {
           </div>
         )}
 
-        {/* Skeleton cards */}
         {loading && (
           [...Array(4)].map((_, i) => (
             <div key={i} className="skeleton" style={{
@@ -111,7 +193,6 @@ const Shops = () => {
           ))
         )}
 
-        {/* Shop cards */}
         {!loading && !error && filtered.length === 0 && (
           <div className="text-center py-10 font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.2rem" }}>
             找不到相關店家
@@ -149,22 +230,30 @@ const Shops = () => {
                 <div className="font-hand font-bold flex-1 min-w-0" style={{ fontSize: "1.4rem", lineHeight: 1.15, color: "var(--ink)" }}>
                   {shop.name}
                 </div>
-                {shop.googleMapLink && (
-                  <a
-                    href={shop.googleMapLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 flex items-center justify-center transition-all duration-150 hover:rotate-[-8deg] hover:scale-105"
-                    style={{
-                      width: 34, height: 34, borderRadius: "50%",
-                      background: "var(--blue-soft)", color: "var(--blue)",
-                      border: "1.5px solid var(--blue)",
-                      textDecoration: "none",
-                    }}
-                  >
-                    {PIN_SVG}
-                  </a>
-                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  {isDevMode && (
+                    <>
+                      <EditBtn onClick={(e) => openEdit(shop, e)} />
+                      <DeleteBtn onClick={(e) => handleDelete(shop.id, e)} />
+                    </>
+                  )}
+                  {shop.googleMapLink && (
+                    <a
+                      href={shop.googleMapLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center transition-all duration-150 hover:rotate-[-8deg] hover:scale-105"
+                      style={{
+                        width: 34, height: 34, borderRadius: "50%",
+                        background: "var(--blue-soft)", color: "var(--blue)",
+                        border: "1.5px solid var(--blue)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      {PIN_SVG}
+                    </a>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5 mb-1" style={{ fontSize: ".82rem", color: "var(--ink-soft)" }}>
                 <span style={{ color: "var(--ink-faint)", flexShrink: 0 }}>{PIN_SVG}</span>
@@ -195,7 +284,31 @@ const Shops = () => {
             </div>
           );
         })}
+
+        {/* Add button (dev only) */}
+        {isDevMode && !loading && !error && (
+          <div className="flex justify-center pt-2">
+            <AddBtn onClick={openAdd} label="新增店家" />
+          </div>
+        )}
       </div>
+
+      {/* Edit / Add modal (dev only) */}
+      {isDevMode && (
+        <EditModal
+          title={modalTitle}
+          open={isEditing}
+          onClose={closeModal}
+          onSave={handleSave}
+          saving={saving}
+        >
+          <FieldInput label="店名" value={draft.name} onChange={(v) => setDraft((d) => ({ ...d, name: v }))} placeholder="店家名稱" />
+          <FieldInput label="地點" value={draft.location} onChange={(v) => setDraft((d) => ({ ...d, location: v }))} placeholder="地點描述" />
+          <FieldInput label="營業時間" value={draft.businessHours} onChange={(v) => setDraft((d) => ({ ...d, businessHours: v }))} placeholder="10:00 - 20:00" />
+          <FieldTags label="標籤" value={draft.tags} onChange={(v) => setDraft((d) => ({ ...d, tags: v }))} placeholder="家電, 轉蛋, 美食" />
+          <FieldInput label="Google Map 連結" value={draft.googleMapLink} onChange={(v) => setDraft((d) => ({ ...d, googleMapLink: v }))} placeholder="https://maps.app.goo.gl/..." type="url" />
+        </EditModal>
+      )}
     </div>
   );
 };

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Trip } from "../types";
 import { useTheme } from "../contexts/ThemeContext";
+import { isDevMode, saveData } from "../hooks/useDataEditor";
+import { EditModal, FieldInput, EditBtn, DevBanner } from "../components/editor";
 
 function seasonTag(startDate: string) {
   const m = parseInt(startDate.split("-")[1], 10);
@@ -21,12 +23,35 @@ function calcDays(s: string, e: string) {
   return Math.round((new Date(e).getTime() - new Date(s).getTime()) / 86400000) + 1;
 }
 
+type TripDraft = {
+  name: string;
+  startDate: string;
+  endDate: string;
+  coverImage: string;
+  snapshot: string;
+};
+
+function tripToDraft(trip: Trip): TripDraft {
+  return {
+    name: trip.name,
+    startDate: trip.startDate,
+    endDate: trip.endDate,
+    coverImage: trip.coverImage,
+    snapshot: trip.snapshot ?? "",
+  };
+}
+
 const Home = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   const { theme, toggleTheme } = useTheme();
+
+  /* Edit state (dev only) */
+  const [editTarget, setEditTarget] = useState<Trip | null>(null);
+  const [draft, setDraft] = useState<TripDraft>({ name: "", startDate: "", endDate: "", coverImage: "", snapshot: "" });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/trips.json`)
@@ -35,6 +60,34 @@ const Home = () => {
       .catch(() => { setError(true); setLoading(false); });
   }, [retry]);
 
+  const openEdit = (trip: Trip, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraft(tripToDraft(trip));
+    setEditTarget(trip);
+  };
+
+  const closeModal = () => setEditTarget(null);
+
+  const handleSave = async () => {
+    if (!editTarget) return;
+    setSaving(true);
+    try {
+      const next = trips.map((t) =>
+        t.id === editTarget.id
+          ? { ...t, ...draft, snapshot: draft.snapshot || undefined }
+          : t
+      );
+      setTrips(next);
+      await saveData("trips", next);
+      closeModal();
+    } catch (err) {
+      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
@@ -42,7 +95,6 @@ const Home = () => {
         className="shrink-0 pt-safe-home px-6 pb-5 relative"
         style={{ background: "var(--paper)", borderBottom: "1.5px dashed var(--rule)" }}
       >
-        {/* Washi corner decoration */}
         <div
           aria-hidden
           style={{
@@ -84,6 +136,8 @@ const Home = () => {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto scrollbar-hide dot-grid-bg px-4 pb-8 pt-5">
+        {isDevMode && <DevBanner />}
+
         <div
           className="font-hand font-bold flex items-center gap-2.5 mb-4 mx-1"
           style={{ fontSize: "1.15rem", color: "var(--red)" }}
@@ -176,6 +230,17 @@ const Home = () => {
                   transform: "rotate(8deg)", boxShadow: "0 2px 4px rgba(40,30,20,.18)",
                 }} />
 
+                {/* Dev edit button */}
+                {isDevMode && (
+                  <div
+                    className="absolute z-10"
+                    style={{ bottom: 14, right: 14 }}
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    <EditBtn onClick={(e) => openEdit(trip, e)} />
+                  </div>
+                )}
+
                 {/* Cover */}
                 <div className="relative overflow-hidden rounded-sm" style={{ height: 170 }}>
                   <img
@@ -227,6 +292,25 @@ const Home = () => {
           );
         })}
       </div>
+
+      {/* Edit modal (dev only) */}
+      {isDevMode && (
+        <EditModal
+          title="編輯旅行"
+          open={Boolean(editTarget)}
+          onClose={closeModal}
+          onSave={handleSave}
+          saving={saving}
+        >
+          <FieldInput label="旅行名稱" value={draft.name} onChange={(v) => setDraft((d) => ({ ...d, name: v }))} placeholder="福岡・熊本" />
+          <div className="grid grid-cols-2 gap-3">
+            <FieldInput label="開始日期" value={draft.startDate} onChange={(v) => setDraft((d) => ({ ...d, startDate: v }))} type="date" />
+            <FieldInput label="結束日期" value={draft.endDate} onChange={(v) => setDraft((d) => ({ ...d, endDate: v }))} type="date" />
+          </div>
+          <FieldInput label="封面圖 URL" value={draft.coverImage} onChange={(v) => setDraft((d) => ({ ...d, coverImage: v }))} placeholder="https://..." type="url" />
+          <FieldInput label="快照圖路徑（選填）" value={draft.snapshot} onChange={(v) => setDraft((d) => ({ ...d, snapshot: v }))} placeholder="data/kyushu-2024/snapshot.jpg" />
+        </EditModal>
+      )}
     </div>
   );
 };
