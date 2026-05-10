@@ -114,7 +114,7 @@ const mockDays: ItineraryDay[] = [
         id: "item-2",
         title: "抵達飯店",
         location: "福岡市區",
-        category: "hotel",
+        category: "accommodation",
         startTime: "15:00",
         endTime: "16:00",
       },
