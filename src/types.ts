@@ -21,7 +21,7 @@ export interface ItineraryItem {
 
 export interface ItineraryDay {
   id: string;
-  day: number;
+  day: number | string;
   date: string;
   items: ItineraryItem[];
 }

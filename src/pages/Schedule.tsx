@@ -120,7 +120,7 @@ const emptyDraft = (): ItemDraft => ({
 });
 
 /* ── Draft state for adding an ItineraryDay ── */
-type DayDraft = { date: string; day: number };
+type DayDraft = { date: string; day: string };
 
 function nextDateStr(dateStr: string): string {
   const d = new Date(dateStr);
@@ -152,7 +152,7 @@ const Schedule = () => {
 
   /* Day-level edit state (dev only) */
   const [isAddingDay, setIsAddingDay] = useState(false);
-  const [dayDraft, setDayDraft] = useState<DayDraft>({ date: "", day: 1 });
+  const [dayDraft, setDayDraft] = useState<DayDraft>({ date: "", day: "1" });
   const [savingDay, setSavingDay] = useState(false);
 
   useEffect(() => {
@@ -226,7 +226,7 @@ const Schedule = () => {
     const last = days[days.length - 1];
     setDayDraft({
       date: last ? nextDateStr(last.date) : "",
-      day: days.length + 1,
+      day: String(days.length + 1),
     });
     setIsAddingDay(true);
   };
@@ -244,9 +244,10 @@ const Schedule = () => {
   const handleSaveDay = async () => {
     setSavingDay(true);
     try {
+      const parsedDay = Number(dayDraft.day);
       const newDay: ItineraryDay = {
         id: `day-${Date.now()}`,
-        day: dayDraft.day,
+        day: isNaN(parsedDay) ? dayDraft.day : parsedDay,
         date: dayDraft.date,
         items: [],
       };
@@ -681,7 +682,7 @@ const Schedule = () => {
           saving={savingDay}
         >
           <FieldInput label="日期" value={dayDraft.date} onChange={(v) => setDayDraft((d) => ({ ...d, date: v }))} type="date" />
-          <FieldInput label="第幾天（Day N）" value={String(dayDraft.day)} onChange={(v) => setDayDraft((d) => ({ ...d, day: parseInt(v) || 1 }))} type="number" />
+          <FieldInput label="第幾天（Day N）" value={dayDraft.day} onChange={(v) => setDayDraft((d) => ({ ...d, day: v }))} placeholder="1 或 8A" />
         </EditModal>
       )}
 
