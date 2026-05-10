@@ -5,6 +5,9 @@ import { cleanup } from "@testing-library/react";
 // 每個測試後清理 DOM
 afterEach(cleanup);
 
+// jsdom 未實作 scrollIntoView，全域 mock
+Element.prototype.scrollIntoView = () => {};
+
 // jsdom 未實作 matchMedia，全域 mock
 Object.defineProperty(window, "matchMedia", {
   writable: true,

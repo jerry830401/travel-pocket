@@ -4,6 +4,7 @@ import type { Trip, ItineraryDay, ItineraryItem } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import { isDevMode, saveData } from "../hooks/useDataEditor";
 import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
+import { toMins, gapLabel, dateBig, weekday } from "./scheduleUtils";
 
 /* Category sticker data */
 const CATS: Record<string, { g: string; cls: string; l: string }> = {
@@ -25,20 +26,6 @@ const CATEGORY_OPTIONS = [
   { value: "other", label: "· 其他" },
 ];
 
-function toMins(s: string | undefined) {
-  if (!s) return null;
-  const [h, m] = s.split(":").map(Number);
-  return h * 60 + m;
-}
-function gapLabel(diff: number | null) {
-  if (!diff || diff <= 0) return null;
-  const h = Math.floor(diff / 60), m = diff % 60;
-  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
-}
-function dateBig(d: string) { const [,mo,dy] = d.split("-"); return `${mo} / ${dy}`; }
-function weekday(d: string) {
-  return ["SUN","MON","TUE","WED","THU","FRI","SAT"][new Date(d).getDay()];
-}
 function getTodayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
