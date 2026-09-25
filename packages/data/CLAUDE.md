@@ -18,5 +18,6 @@ To add a new trip: add its folder here, populate the three JSON files, then add 
 ## Consumers
 
 - `apps/web` serves these files at `data/` in dev and copies them into `dist/data/` at build time (`vite-plugin-trip-data.ts`).
+- `apps/api` loads them into D1 through its own API with `db:seed` (`scripts/seed.ts`).
 
 Consumers locate files through the package name (`@travel-pocket/data/trips.json`), never through a relative path into `packages/`. `exports` exposes every `*.json` file for that purpose.
