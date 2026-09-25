@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet, useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import type { Trip } from "../types";
+import { loadTrips } from "../dataSource";
 import { useTheme } from "../contexts/ThemeContext";
 
 const TripView = () => {
@@ -12,9 +13,8 @@ const TripView = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/trips.json`)
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((data: Trip[]) => {
+    loadTrips()
+      .then((data) => {
         const found = data.find((t) => t.id === tripId);
         if (found) setTrip(found);
         else setError(true);

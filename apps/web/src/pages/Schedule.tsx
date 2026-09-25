@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, ItineraryDay, ItineraryItem } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
-import { isDevMode, saveData } from "../hooks/useDataEditor";
+import { isDevMode, loadTripData, saveTripData } from "../dataSource";
 import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
 import { toMins, gapLabel, dateBig, weekday } from "./scheduleUtils";
 
@@ -144,9 +144,8 @@ const Schedule = () => {
 
   useEffect(() => {
     if (!trip) return;
-    fetch(`${import.meta.env.BASE_URL}data/${trip.id}/itinerary.json`)
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((data: ItineraryDay[]) => {
+    loadTripData(trip.id, "itinerary")
+      .then((data) => {
         setDays(data);
         const ti = data.findIndex((d) => d.date === today);
         if (ti >= 0) setDayIdx(ti);
@@ -225,7 +224,7 @@ const Schedule = () => {
     const newIdx = Math.min(dayIdx, next.length - 1);
     setDays(next);
     setDayIdx(Math.max(0, newIdx));
-    saveData(`${trip.id}/itinerary`, next).catch(console.error);
+    saveTripData(trip.id, "itinerary", next).catch(console.error);
   };
 
   const handleSaveDay = async () => {
@@ -241,7 +240,7 @@ const Schedule = () => {
       const next = [...days, newDay].sort((a, b) => a.date.localeCompare(b.date));
       setDays(next);
       setDayIdx(next.findIndex((d) => d.id === newDay.id));
-      await saveData(`${trip.id}/itinerary`, next);
+      await saveTripData(trip.id, "itinerary", next);
       setIsAddingDay(false);
     } catch (err) {
       alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
@@ -257,7 +256,7 @@ const Schedule = () => {
       d.id === dayId ? { ...d, items: d.items.filter((it) => it.id !== itemId) } : d
     );
     setDays(next);
-    saveData(`${trip.id}/itinerary`, next).catch(console.error);
+    saveTripData(trip.id, "itinerary", next).catch(console.error);
   };
 
   const handleSave = async () => {
@@ -281,7 +280,7 @@ const Schedule = () => {
         return;
       }
       setDays(next);
-      await saveData(`${trip.id}/itinerary`, next);
+      await saveTripData(trip.id, "itinerary", next);
       closeModal();
     } catch (err) {
       alert(`儲存失敗：${err instanceof Error ? err.message : err}`);

@@ -58,8 +58,8 @@ Frontend, backend, and any app added later **must be developed in complete isola
 Run from the repo root:
 
 ```bash
-pnpm dev          # Start the web dev server (same as pnpm dev:web)
-pnpm dev:web      # Start the web dev server only
+pnpm dev          # Start web + API together (every app's dev:fullstack); edits go to the local D1
+pnpm dev:web      # Start the web dev server only (static JSON, read-only)
 pnpm dev:api      # Start the API (wrangler dev on :8787, local D1) only
 pnpm build        # Run build in every workspace package
 pnpm lint         # Run ESLint in every workspace package
@@ -68,4 +68,4 @@ pnpm test:e2e     # Run web Playwright E2E tests (auto-starts dev server)
 pnpm preview      # Preview the web production build locally
 ```
 
-`build`, `lint`, and `test` run recursively (`pnpm -r`). When working on a single workspace, target it with `pnpm -F <package> <script>` instead; each workspace's `CLAUDE.md` lists its own scripts.
+`build`, `lint`, and `test` run recursively (`pnpm -r`). `pnpm dev` runs with `--parallel --no-bail`, so if the API stops, the web dev server keeps running and falls back to static JSON. When working on a single workspace, target it with `pnpm -F <package> <script>` instead; each workspace's `CLAUDE.md` lists its own scripts.

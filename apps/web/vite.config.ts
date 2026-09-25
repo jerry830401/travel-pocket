@@ -1,13 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
-import { dataEditorPlugin } from "./vite-plugin-data-editor";
 import { tripDataPlugin } from "./vite-plugin-trip-data";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    dataEditorPlugin(),
     tripDataPlugin(),
     react(),
     VitePWA({
@@ -46,6 +44,20 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
+            // The API is cross-origin in production, so match on the pathname
+            // instead of a same-origin regex.
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            method: "GET",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "trip-api",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+              },
+            },
+          },
+          {
             urlPattern: /\/travel-pocket\/data\/.*\.json$/,
             handler: "NetworkFirst",
             options: {
@@ -63,5 +75,9 @@ export default defineConfig({
   base: "/travel-pocket/",
   server: {
     host: true,
+    // `pnpm dev` (mode fullstack) sets VITE_API_URL=/api; forward it to wrangler dev.
+    proxy: {
+      "/api": "http://localhost:8787",
+    },
   },
 });

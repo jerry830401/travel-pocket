@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { DATA_TYPES, ID_PATTERN } from "@travel-pocket/shared";
 
 // Resolved through the package name so the location stays the package's concern.
-export const TRIP_DATA_DIR = path.dirname(
+const TRIP_DATA_DIR = path.dirname(
   createRequire(import.meta.url).resolve("@travel-pocket/data/trips.json")
 );
 

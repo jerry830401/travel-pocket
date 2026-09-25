@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, Shop } from "../types";
-import { isDevMode, saveData } from "../hooks/useDataEditor";
+import { isDevMode, loadTripData, saveTripData } from "../dataSource";
 import { EditModal, FieldInput, FieldTags, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
 
 const PIN_SVG = (
@@ -57,9 +57,8 @@ const Shops = () => {
 
   useEffect(() => {
     if (!trip) return;
-    fetch(`${import.meta.env.BASE_URL}data/${trip.id}/shops.json`)
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((data: Shop[]) => { setShops(data); setLoading(false); })
+    loadTripData(trip.id, "shops")
+      .then((data) => { setShops(data); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   }, [trip, retry]);
 
@@ -95,7 +94,7 @@ const Shops = () => {
     if (!confirm("確定要刪除這間店家？")) return;
     const next = shops.filter((s) => s.id !== shopId);
     setShops(next);
-    saveData(`${trip.id}/shops`, next).catch(console.error);
+    saveTripData(trip.id, "shops", next).catch(console.error);
   };
 
   const handleSave = async () => {
@@ -109,7 +108,7 @@ const Shops = () => {
         next = [...shops, draftToShop(draft, newId)];
       }
       setShops(next);
-      await saveData(`${trip.id}/shops`, next);
+      await saveTripData(trip.id, "shops", next);
       closeModal();
     } catch (err) {
       alert(`儲存失敗：${err instanceof Error ? err.message : err}`);

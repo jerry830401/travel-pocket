@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, InfoItem, InfoLink } from "../types";
-import { isDevMode, saveData } from "../hooks/useDataEditor";
+import { isDevMode, loadTripData, saveTripData } from "../dataSource";
 import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
 
 const EXT = (
@@ -34,16 +34,15 @@ const Info = () => {
 
   useEffect(() => {
     if (!trip) return;
-    fetch(`${import.meta.env.BASE_URL}data/${trip.id}/info.json`)
-      .then((r) => r.json())
-      .then((data: InfoItem[]) => { setItems(data); setLoading(false); })
+    loadTripData(trip.id, "info")
+      .then((data) => { setItems(data); setLoading(false); })
       .catch(console.error);
   }, [trip]);
 
   /* Persist helper */
   const persist = (next: InfoItem[]) => {
     setItems(next);
-    return saveData(`${trip.id}/info`, next);
+    return saveTripData(trip.id, "info", next);
   };
 
   /* ── InfoItem actions ── */

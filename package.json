@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.28.0",
   "scripts": {
-    "dev": "pnpm -F @travel-pocket/web dev",
+    "dev": "pnpm -r --parallel --no-bail run dev:fullstack",
     "dev:web": "pnpm -F @travel-pocket/web dev",
     "dev:api": "pnpm -F @travel-pocket/api dev",
     "build": "pnpm -r run build",

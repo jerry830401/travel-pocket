@@ -6,6 +6,7 @@
   "homepage": "https://jerry830401.github.io/travel-pocket/",
   "scripts": {
     "dev": "vite",
+    "dev:fullstack": "vite --mode fullstack",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

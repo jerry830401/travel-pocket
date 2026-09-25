@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Trip } from "../types";
 import { useTheme } from "../contexts/ThemeContext";
-import { isDevMode, saveData } from "../hooks/useDataEditor";
+import { isDevMode, loadTrips, saveTrips } from "../dataSource";
 import { EditModal, FieldInput, EditBtn, DevBanner } from "../components/editor";
 
 function seasonTag(startDate: string) {
@@ -54,9 +54,8 @@ const Home = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/trips.json`)
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((data: Trip[]) => { setTrips(data); setLoading(false); })
+    loadTrips()
+      .then((data) => { setTrips(data); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   }, [retry]);
 
@@ -79,7 +78,7 @@ const Home = () => {
           : t
       );
       setTrips(next);
-      await saveData("trips", next);
+      await saveTrips(next);
       closeModal();
     } catch (err) {
       alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
