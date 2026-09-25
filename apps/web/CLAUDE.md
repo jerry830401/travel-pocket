@@ -41,6 +41,7 @@ Pages never call `fetch` for trip data themselves; they go through `src/dataSour
 - Each page keeps its own `editable` state from its load and gates every edit control on it. `apiEnabled && !editable` (once loaded) shows `ReadOnlyBanner` to explain why the controls are gone.
 - Writes: `saveTrips`, `saveTripData` (`PUT`), `createTrip` (`POST`, the server assigns the id) and `deleteTrip` (`DELETE`, which also removes the trip's itinerary, shops and info). All of them reject when there is no API.
 - `loadMe()` returns the signed-in `Me`, or null. `signOut()` clears the `trip-api` cache and goes to `/cdn-cgi/access/logout`. Home shows the email, and shows 登出 outside the dev server, which has no Access.
+- Signed out: Access answers every request without a session by redirecting to its login page (which shows a 「Google」 button; instant authentication is off, so nobody is sent to Google without clicking). API calls use `redirect: "manual"`, so that redirect (or a 401) becomes a `SignInRequiredError` and notifies `onSignedOut` listeners instead of failing as a cross-origin fetch. `SignInGate` (around the routes in `App.tsx`) then replaces the app with a 「請先登入」 screen whose 前往登入 button reloads through the network (`goToSignIn`). Nothing redirects on its own. This covers the app opening from the service worker (after the session expired) and a session ending while the app is open.
 
 | Command | Data source | Editable |
 |---|---|---|
@@ -71,6 +72,7 @@ Edits made in the browser go to the local D1, never back into `packages/data/`.
 
 - The service worker (`vite-plugin-pwa`, `generateSW`) caches GET `/api/` responses in `trip-api` (`NetworkFirst`, 7 days). When the network fails it answers from that cache and adds `X-Travel-Pocket-Cache: 1` (a `cachedResponseWillBeUsed` plugin in `vite.config.ts`), so `dataSource.ts` reports the data as not editable. The plugin is serialized into the service worker, so it repeats the header name instead of importing `SW_CACHE_HEADER`.
 - `signOut()` deletes `trip-api`, so the next person on the same device never sees the previous user's trips.
+- Page loads always go to the network (`NetworkOnly`), so Access sees them and can redirect a signed-out visitor to its login page. Its callback `/cdn-cgi/access/authorized`, which sets the session cookie, is never touched by the service worker. `navigateFallback` and `directoryIndex` are `null` on purpose: either one would answer `/` with the precached `index.html` and skip Access. Only when the network fails (offline) does the navigation rule fall back to that precached copy (`handlerDidError`). Both cache rules keep only `200` responses, never Access's redirect.
 
 ## Theming
 

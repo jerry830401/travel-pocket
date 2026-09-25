@@ -42,7 +42,38 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Cloudflare Access guards every URL, so page loads must reach the
+        // network: a precached index.html would hide its login redirect and
+        // its /cdn-cgi/access/authorized callback. Hence no navigation
+        // fallback, and no directoryIndex (which would answer "/" with the
+        // precached index.html). The rule below serves that copy offline only.
+        navigateFallback: null,
+        directoryIndex: null,
         runtimeCaching: [
+          {
+            urlPattern: ({ request, url }) =>
+              request.mode === "navigate" && !url.pathname.startsWith("/cdn-cgi/"),
+            handler: "NetworkOnly",
+            options: {
+              plugins: [
+                {
+                  // The network failed (offline): open the precached app
+                  // shell. Its cache key carries a __WB_REVISION__ parameter,
+                  // hence ignoreSearch. Serialized into the service worker, so
+                  // it may use only globals.
+                  handlerDidError: async () => {
+                    // A service worker global, missing from this file's Node typings.
+                    const { caches } = globalThis as unknown as {
+                      caches: {
+                        match(url: string, options: { ignoreSearch: boolean }): Promise<Response | undefined>;
+                      };
+                    };
+                    return caches.match("/index.html", { ignoreSearch: true });
+                  },
+                },
+              ],
+            },
+          },
           {
             // Matched on the pathname, which works whether the API is on this
             // origin or another one.
@@ -55,6 +86,8 @@ export default defineConfig({
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
               },
+              // Requests use redirect: "manual"; never keep Access's login redirect.
+              cacheableResponse: { statuses: [200] },
               plugins: [
                 {
                   // Marks answers from the cache (the network failed) so the

@@ -25,6 +25,45 @@ export interface Loaded<T> {
   editable: boolean;
 }
 
+/** The API call found no signed-in user. */
+export class SignInRequiredError extends Error {
+  constructor() {
+    super("請先登入");
+    this.name = "SignInRequiredError";
+  }
+}
+
+const signedOutListeners = new Set<() => void>();
+
+/** Called whenever an API call finds no signed-in user. Returns an unsubscribe function. */
+export function onSignedOut(listener: () => void): () => void {
+  signedOutListeners.add(listener);
+  return () => {
+    signedOutListeners.delete(listener);
+  };
+}
+
+/**
+ * Reloads through the network, where Cloudflare Access shows its login page
+ * to a signed-out visitor (the service worker never answers navigations from
+ * its cache while online).
+ */
+export function goToSignIn(): void {
+  window.location.reload();
+}
+
+// Cloudflare Access answers a request without a valid session with a redirect
+// to its login page. `redirect: "manual"` turns that into an opaque redirect
+// here instead of a failed cross-origin fetch; the API itself answers 401.
+async function apiFetch(apiPath: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(`${API_URL}${apiPath}`, { ...init, redirect: "manual" });
+  if (res.type === "opaqueredirect" || res.status === 401) {
+    for (const listener of signedOutListeners) listener();
+    throw new SignInRequiredError();
+  }
+  return res;
+}
+
 async function get(url: string): Promise<Response> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
@@ -39,12 +78,13 @@ async function loadStatic<T>(staticPath: string): Promise<Loaded<T>> {
 async function load<T>(apiPath: string, staticPath: string): Promise<Loaded<T>> {
   if (!API_URL) return loadStatic(staticPath);
   try {
-    const res = await get(`${API_URL}${apiPath}`);
+    const res = await apiFetch(apiPath);
+    if (!res.ok) throw new Error(`GET ${apiPath} failed: ${res.status}`);
     return { data: (await res.json()) as T, editable: !res.headers.has(SW_CACHE_HEADER) };
   } catch (err) {
     // Only the dev server still serves the static JSON (from packages/data);
-    // production builds no longer ship it.
-    if (!import.meta.env.DEV) throw err;
+    // production builds no longer ship it. Signing in is never papered over.
+    if (!import.meta.env.DEV || err instanceof SignInRequiredError) throw err;
     return loadStatic(staticPath);
   }
 }
@@ -60,11 +100,12 @@ export function loadTripData<T extends DataType>(
   return load(`/trips/${tripId}/${type}`, `${tripId}/${type}.json`);
 }
 
-/** The signed-in user, or null without an API or when it cannot be reached. */
+/** The signed-in user, or null without an API, when signed out, or when it cannot be reached. */
 export async function loadMe(): Promise<Me | null> {
   if (!API_URL) return null;
   try {
-    return (await (await get(`${API_URL}/me`)).json()) as Me;
+    const res = await apiFetch("/me");
+    return res.ok ? ((await res.json()) as Me) : null;
   } catch {
     return null;
   }
@@ -74,7 +115,7 @@ export async function loadMe(): Promise<Me | null> {
 // API needs to know who is asking.
 async function send(method: "POST" | "PUT" | "DELETE", apiPath: string, body?: unknown) {
   if (!API_URL) throw new Error("Editing needs the API");
-  const res = await fetch(`${API_URL}${apiPath}`, {
+  const res = await apiFetch(apiPath, {
     method,
     ...(body !== undefined && {
       headers: { "Content-Type": "application/json" },
