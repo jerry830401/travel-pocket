@@ -8,22 +8,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Travel Pocket is a mobile-optimized PWA (Progressive Web App) for managing travel itineraries. It is deployed to GitHub Pages and reads all trip data from static JSON files in `/public/data/`.
+Travel Pocket is a mobile-optimized PWA (Progressive Web App) for managing travel itineraries. It is deployed to GitHub Pages and reads all trip data from static JSON files in `apps/web/public/data/`.
+
+The repo is a **pnpm workspace** monorepo. The frontend lives in `apps/web/` (package `@travel-pocket/web`); workspace globs are `apps/*` and `packages/*` (see `pnpm-workspace.yaml`). Unless noted otherwise, paths in the Architecture section are relative to `apps/web/`.
 
 ## Commands
 
-```bash
-pnpm dev          # Start Vite dev server with HMR
-pnpm build        # TypeScript check + production Vite build (outputs to dist/)
-pnpm lint         # Run ESLint
-pnpm preview      # Preview production build locally
-pnpm deploy       # Build then push dist/ to GitHub Pages via gh-pages
+Run from the repo root:
 
-pnpm test              # Run Vitest unit tests (single run)
-pnpm test:watch        # Run Vitest in watch mode
-pnpm test:coverage     # Run Vitest with V8 coverage report
-pnpm test:e2e          # Run Playwright E2E tests (auto-starts dev server)
-pnpm test:e2e:ui       # Run Playwright E2E tests with interactive UI
+```bash
+pnpm dev          # Start the web Vite dev server with HMR (same as pnpm dev:web)
+pnpm dev:web      # Start the web Vite dev server only
+pnpm build        # Run build in every workspace package (web: tsc + Vite build to apps/web/dist/)
+pnpm lint         # Run ESLint in every workspace package
+pnpm preview      # Preview the web production build locally
+
+pnpm test              # Run Vitest unit tests in every workspace package
+pnpm test:e2e          # Run web Playwright E2E tests (auto-starts dev server)
+```
+
+Other web scripts run through a filter:
+
+```bash
+pnpm -F @travel-pocket/web test:watch      # Vitest watch mode
+pnpm -F @travel-pocket/web test:coverage   # Vitest with V8 coverage report
+pnpm -F @travel-pocket/web test:e2e:ui     # Playwright interactive UI
+pnpm -F @travel-pocket/web run deploy      # Build then push dist/ via gh-pages (`run` is required: `pnpm deploy` is a pnpm built-in)
 ```
 
 ## Architecture
@@ -36,16 +46,16 @@ Uses **HashRouter** (not BrowserRouter) — required for GitHub Pages static hos
 
 ### Data
 
-All trip data is **static JSON** fetched at runtime from `/public/data/`:
+All trip data is **static JSON** fetched at runtime from `public/data/`:
 
 - `trips.json` — Array of `Trip` metadata (id, name, dates, cover image, snapshot path)
 - `{tripId}/itinerary.json` — `ItineraryDay[]` (array of days, each with `ItineraryItem[]`)
 - `{tripId}/shops.json` — `Shop[]`
 - `{tripId}/info.json` — `InfoItem[]`
 
-To add a new trip: add its folder under `/public/data/`, populate the three JSON files, then add an entry to `trips.json`. No code changes are needed unless new data fields are introduced.
+To add a new trip: add its folder under `public/data/`, populate the three JSON files, then add an entry to `trips.json`. No code changes are needed unless new data fields are introduced.
 
-All TypeScript interfaces for data structures are defined in [src/types.ts](src/types.ts).
+All TypeScript interfaces for data structures are defined in [src/types.ts](apps/web/src/types.ts).
 
 ### Theming
 

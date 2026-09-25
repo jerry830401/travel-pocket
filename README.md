@@ -38,23 +38,30 @@ pnpm install
 pnpm dev          # http://localhost:5173/travel-pocket/
 ```
 
-未使用 proto 也可以，`package.json` 的 `packageManager` 欄位會讓 corepack 對上同一個 pnpm 版本。
+未使用 proto 也可以，根目錄 `package.json` 的 `packageManager` 欄位會讓 corepack 對上同一個 pnpm 版本。
+
+專案採用 **pnpm workspace** monorepo，前端位於 `apps/web/`（套件名稱 `@travel-pocket/web`）。以下指令都在 repo 根目錄執行。
 
 ### 指令
 
 ```bash
-pnpm dev            # Vite dev server（含 HMR 與編輯模式）
-pnpm build          # tsc 型別檢查 + production build，輸出到 dist/
-pnpm preview        # 在本機預覽 production build
-pnpm lint           # ESLint
+pnpm dev            # 前端 Vite dev server（含 HMR 與編輯模式）
+pnpm dev:web        # 同上，只啟動前端
+pnpm build          # 所有 workspace 套件的 build（前端：tsc 型別檢查 + production build，輸出到 apps/web/dist/）
+pnpm preview        # 在本機預覽前端 production build
+pnpm lint           # 所有 workspace 套件的 ESLint
 
-pnpm test           # Vitest 單元測試（單次執行）
-pnpm test:watch     # Vitest watch 模式
-pnpm test:coverage  # V8 coverage 報告
-pnpm test:e2e       # Playwright E2E（自動啟動 dev server）
-pnpm test:e2e:ui    # Playwright 互動式 UI
+pnpm test           # 所有 workspace 套件的 Vitest 單元測試（單次執行）
+pnpm test:e2e       # 前端 Playwright E2E（自動啟動 dev server）
+```
 
-pnpm deploy         # build 後以 gh-pages 推送 dist/
+其他前端指令透過 filter 執行：
+
+```bash
+pnpm -F @travel-pocket/web test:watch     # Vitest watch 模式
+pnpm -F @travel-pocket/web test:coverage  # V8 coverage 報告
+pnpm -F @travel-pocket/web test:e2e:ui    # Playwright 互動式 UI
+pnpm -F @travel-pocket/web run deploy     # build 後以 gh-pages 推送 dist/（`pnpm deploy` 是 pnpm 內建指令，必須加 run）
 ```
 
 ## 專案結構
@@ -62,40 +69,44 @@ pnpm deploy         # build 後以 gh-pages 推送 dist/
 ```
 ├── .github/workflows/deploy.yml   # push 到 master 自動部署 GitHub Pages
 ├── .prototools                    # 釘選 node / pnpm 版本
+├── package.json                   # workspace 根目錄：只放腳本與 packageManager
+├── pnpm-workspace.yaml            # workspace 範圍：apps/*、packages/*
 ├── docs/                          # 需求文件與套件說明
-├── e2e/                           # Playwright E2E 測試
-│   ├── home.spec.ts
-│   └── trip.spec.ts
-├── public/
-│   ├── data/                      # 所有行程資料（靜態 JSON）
-│   │   ├── trips.json             # 旅程清單
-│   │   ├── sendai-2026/
-│   │   │   ├── itinerary.json
-│   │   │   ├── shops.json
-│   │   │   ├── info.json
-│   │   │   └── snapshot.jpg
-│   │   └── kyushu-2024/…
-│   └── icons/                     # PWA 圖示
-├── src/
-│   ├── App.tsx                    # 路由定義與外層容器
-│   ├── main.tsx                   # 進入點
-│   ├── types.ts                   # 所有資料結構的 TypeScript 介面
-│   ├── pages/
-│   │   ├── Home.tsx               # 旅程選擇首頁
-│   │   ├── TripView.tsx           # 巢狀路由的 layout shell，負責抓資料
-│   │   ├── Schedule.tsx           # 行程表
-│   │   ├── scheduleUtils.ts       # 時間差／日期格式的純函式
-│   │   ├── Shops.tsx              # 店鋪
-│   │   └── Info.tsx               # 資訊
-│   ├── components/
-│   │   ├── ThemeToggle.tsx
-│   │   ├── UpdatePrompt.tsx       # PWA 更新提示
-│   │   └── editor/                # 開發用編輯模式 UI 元件
-│   ├── contexts/ThemeContext.tsx  # 深淺色主題
-│   ├── hooks/useDataEditor.ts     # 編輯模式的儲存 API
-│   └── test/                      # Vitest setup 與 mock
-├── vite-plugin-data-editor.ts     # dev-only 的 JSON 讀寫 REST API
-└── vite.config.ts
+└── apps/
+    └── web/                       # 前端（@travel-pocket/web）
+        ├── e2e/                   # Playwright E2E 測試
+        │   ├── home.spec.ts
+        │   └── trip.spec.ts
+        ├── public/
+        │   ├── data/              # 所有行程資料（靜態 JSON）
+        │   │   ├── trips.json     # 旅程清單
+        │   │   ├── sendai-2026/
+        │   │   │   ├── itinerary.json
+        │   │   │   ├── shops.json
+        │   │   │   ├── info.json
+        │   │   │   └── snapshot.jpg
+        │   │   └── kyushu-2024/…
+        │   └── icons/             # PWA 圖示
+        ├── src/
+        │   ├── App.tsx            # 路由定義與外層容器
+        │   ├── main.tsx           # 進入點
+        │   ├── types.ts           # 所有資料結構的 TypeScript 介面
+        │   ├── pages/
+        │   │   ├── Home.tsx       # 旅程選擇首頁
+        │   │   ├── TripView.tsx   # 巢狀路由的 layout shell，負責抓資料
+        │   │   ├── Schedule.tsx   # 行程表
+        │   │   ├── scheduleUtils.ts  # 時間差／日期格式的純函式
+        │   │   ├── Shops.tsx      # 店鋪
+        │   │   └── Info.tsx       # 資訊
+        │   ├── components/
+        │   │   ├── ThemeToggle.tsx
+        │   │   ├── UpdatePrompt.tsx  # PWA 更新提示
+        │   │   └── editor/        # 開發用編輯模式 UI 元件
+        │   ├── contexts/ThemeContext.tsx  # 深淺色主題
+        │   ├── hooks/useDataEditor.ts     # 編輯模式的儲存 API
+        │   └── test/              # Vitest setup 與 mock
+        ├── vite-plugin-data-editor.ts     # dev-only 的 JSON 讀寫 REST API
+        └── vite.config.ts
 ```
 
 單元測試與被測檔案並排放置（`Schedule.tsx` ↔ `Schedule.test.tsx`）。
@@ -115,13 +126,13 @@ pnpm deploy         # build 後以 gh-pages 推送 dist/
 
 ## 資料
 
-所有資料都是 `/public/data/` 底下的靜態 JSON，在執行期以 fetch 取得，沒有後端。型別定義見 [`src/types.ts`](src/types.ts)。
+所有資料都是 `apps/web/public/data/` 底下的靜態 JSON，在執行期以 fetch 取得，沒有後端。型別定義見 [`apps/web/src/types.ts`](apps/web/src/types.ts)。
 
 ### 新增一趟旅程
 
-1. 在 `public/data/` 建立資料夾，名稱即 `tripId`（僅限英數、`-`、`_`）。
+1. 在 `apps/web/public/data/` 建立資料夾，名稱即 `tripId`（僅限英數、`-`、`_`）。
 2. 放入 `itinerary.json`、`shops.json`、`info.json`。
-3. 在 `public/data/trips.json` 加一筆項目。
+3. 在 `apps/web/public/data/trips.json` 加一筆項目。
 
 除非要引入新欄位，否則**不需要改任何程式碼**。
 
@@ -180,12 +191,12 @@ pnpm deploy         # build 後以 gh-pages 推送 dist/
 
 ## 本地編輯模式
 
-`pnpm dev` 時畫面上會出現 `✏ DEV EDIT MODE` 標記，行程／店鋪／資訊都可以直接在 UI 上新增、編輯、刪除，儲存後會**直接寫回 `public/data/` 的 JSON 檔**。
+`pnpm dev` 時畫面上會出現 `✏ DEV EDIT MODE` 標記，行程／店鋪／資訊都可以直接在 UI 上新增、編輯、刪除，儲存後會**直接寫回 `apps/web/public/data/` 的 JSON 檔**。
 
 實作分兩部分：
 
-- [`vite-plugin-data-editor.ts`](vite-plugin-data-editor.ts) — 掛在 dev server 上的 `/api/data/*` REST 端點，含路徑白名單與 traversal 防護。
-- [`src/hooks/useDataEditor.ts`](src/hooks/useDataEditor.ts) — 前端以 `import.meta.env.DEV` 判斷是否啟用。
+- [`vite-plugin-data-editor.ts`](apps/web/vite-plugin-data-editor.ts) — 掛在 dev server 上的 `/api/data/*` REST 端點，含路徑白名單與 traversal 防護。
+- [`src/hooks/useDataEditor.ts`](apps/web/src/hooks/useDataEditor.ts) — 前端以 `import.meta.env.DEV` 判斷是否啟用。
 
 production build 不會包含這條路徑，編輯功能在線上版本完全停用。
 
@@ -201,7 +212,7 @@ production build 不會包含這條路徑，編輯功能在線上版本完全停
 
 ## 部署
 
-推送到 `master` 會觸發 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)，自動 build 並發佈 `dist/` 到 GitHub Pages。也可用 `pnpm deploy` 從本機手動發佈。
+推送到 `master` 會觸發 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)，自動 build 並發佈 `apps/web/dist/` 到 GitHub Pages（只有前端相關路徑變動時才會觸發）。也可用 `pnpm -F @travel-pocket/web run deploy` 從本機手動發佈。
 
 建置注意事項：
 
