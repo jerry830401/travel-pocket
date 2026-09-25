@@ -44,28 +44,35 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
-            // The API is cross-origin in production, so match on the pathname
-            // instead of a same-origin regex.
+            // Matched on the pathname, which works whether the API is on this
+            // origin or another one.
             urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
             method: "GET",
             handler: "NetworkFirst",
             options: {
-              cacheName: "trip-api",
+              cacheName: "trip-api", // signOut() in src/dataSource.ts clears it
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
               },
-            },
-          },
-          {
-            urlPattern: /\/travel-pocket\/data\/.*\.json$/,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "trip-data",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-              },
+              plugins: [
+                {
+                  // Marks answers from the cache (the network failed) so the
+                  // app shows them read-only: see Loaded.editable in
+                  // src/dataSource.ts. This function is serialized into the
+                  // service worker, so the header name is a literal here.
+                  cachedResponseWillBeUsed: async ({ cachedResponse }) => {
+                    if (!cachedResponse) return cachedResponse;
+                    const headers = new Headers(cachedResponse.headers);
+                    headers.set("X-Travel-Pocket-Cache", "1");
+                    return new Response(await cachedResponse.blob(), {
+                      status: cachedResponse.status,
+                      statusText: cachedResponse.statusText,
+                      headers,
+                    });
+                  },
+                },
+              ],
             },
           },
         ],

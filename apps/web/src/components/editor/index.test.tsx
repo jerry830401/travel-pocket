@@ -10,7 +10,7 @@ import {
   EditBtn,
   DeleteBtn,
   AddBtn,
-  DevBanner,
+  ReadOnlyBanner,
 } from "./index";
 
 vi.mock("framer-motion", () => ({
@@ -240,11 +240,11 @@ describe("AddBtn", () => {
   });
 });
 
-/* ── DevBanner ─────────────────────────────────────────────────── */
+/* ── ReadOnlyBanner ────────────────────────────────────────────── */
 
-describe("DevBanner", () => {
-  it("顯示 DEV EDIT MODE 文字", () => {
-    render(<DevBanner />);
-    expect(screen.getByText(/DEV EDIT MODE/)).toBeInTheDocument();
+describe("ReadOnlyBanner", () => {
+  it("說明目前無法編輯", () => {
+    render(<ReadOnlyBanner />);
+    expect(screen.getByRole("status")).toHaveTextContent("暫時無法編輯");
   });
 });

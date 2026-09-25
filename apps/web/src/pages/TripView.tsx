@@ -14,7 +14,7 @@ const TripView = () => {
 
   useEffect(() => {
     loadTrips()
-      .then((data) => {
+      .then(({ data }) => {
         const found = data.find((t) => t.id === tripId);
         if (found) setTrip(found);
         else setError(true);

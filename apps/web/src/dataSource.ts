@@ -1,62 +1,122 @@
-import type { DataType, Trip, TripDataMap } from "./types";
+import type { DataType, Me, NewTrip, Trip, TripDataMap } from "./types";
 
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, "");
 
 /** True when the build points at an API (`VITE_API_URL`); otherwise data is static JSON. */
 export const apiEnabled = !!API_URL;
 
-/** Editing is only offered on the dev server with an API behind it (`pnpm dev`). */
-export const isDevMode = import.meta.env.DEV && apiEnabled;
+/**
+ * Added by the service worker to API responses it answers from its cache
+ * (see the `trip-api` rule in vite.config.ts, which repeats the name because
+ * the service worker code cannot import it).
+ */
+export const SW_CACHE_HEADER = "X-Travel-Pocket-Cache";
 
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
-  return res.json() as Promise<T>;
+/** Cache Storage name of that rule, cleared on sign-out. */
+const API_CACHE = "trip-api";
+
+/**
+ * `editable` is true only for data read live from the API. `PUT` replaces a
+ * whole list, so saving edits made on the static fallback or on a cached copy
+ * could overwrite newer data in the database.
+ */
+export interface Loaded<T> {
+  data: T;
+  editable: boolean;
 }
 
-/** Reads from the API when enabled, falling back to the static JSON under `data/`. */
-async function load<T>(apiPath: string, staticPath: string): Promise<T> {
-  const staticUrl = `${import.meta.env.BASE_URL}data/${staticPath}`;
-  if (!API_URL) return getJson<T>(staticUrl);
+async function get(url: string): Promise<Response> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+  return res;
+}
+
+async function loadStatic<T>(staticPath: string): Promise<Loaded<T>> {
+  const res = await get(`${import.meta.env.BASE_URL}data/${staticPath}`);
+  return { data: (await res.json()) as T, editable: false };
+}
+
+async function load<T>(apiPath: string, staticPath: string): Promise<Loaded<T>> {
+  if (!API_URL) return loadStatic(staticPath);
   try {
-    return await getJson<T>(`${API_URL}${apiPath}`);
-  } catch {
-    return getJson<T>(staticUrl);
+    const res = await get(`${API_URL}${apiPath}`);
+    return { data: (await res.json()) as T, editable: !res.headers.has(SW_CACHE_HEADER) };
+  } catch (err) {
+    // Only the dev server still serves the static JSON (from packages/data);
+    // production builds no longer ship it.
+    if (!import.meta.env.DEV) throw err;
+    return loadStatic(staticPath);
   }
 }
 
-export function loadTrips(): Promise<Trip[]> {
+export function loadTrips(): Promise<Loaded<Trip[]>> {
   return load("/trips", "trips.json");
 }
 
-export function loadTripData<T extends DataType>(tripId: string, type: T): Promise<TripDataMap[T]> {
+export function loadTripData<T extends DataType>(
+  tripId: string,
+  type: T
+): Promise<Loaded<TripDataMap[T]>> {
   return load(`/trips/${tripId}/${type}`, `${tripId}/${type}.json`);
 }
 
-async function put(apiPath: string, data: unknown): Promise<void> {
-  if (!isDevMode) return;
+/** The signed-in user, or null without an API or when it cannot be reached. */
+export async function loadMe(): Promise<Me | null> {
+  if (!API_URL) return null;
+  try {
+    return (await (await get(`${API_URL}/me`)).json()) as Me;
+  } catch {
+    return null;
+  }
+}
+
+// Same-origin requests carry the Cloudflare Access cookie, which is all the
+// API needs to know who is asking.
+async function send(method: "POST" | "PUT" | "DELETE", apiPath: string, body?: unknown) {
+  if (!API_URL) throw new Error("Editing needs the API");
   const res = await fetch(`${API_URL}${apiPath}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${import.meta.env.VITE_ADMIN_TOKEN}`,
-    },
-    body: JSON.stringify(data),
+    method,
+    ...(body !== undefined && {
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error ?? `HTTP ${res.status}`);
   }
+  return res;
 }
 
-export function saveTrips(trips: Trip[]): Promise<void> {
-  return put("/trips", trips);
+export async function saveTrips(trips: Trip[]): Promise<void> {
+  await send("PUT", "/trips", trips);
 }
 
-export function saveTripData<T extends DataType>(
+export async function createTrip(trip: NewTrip): Promise<Trip> {
+  return (await (await send("POST", "/trips", trip)).json()) as Trip;
+}
+
+export async function deleteTrip(tripId: string): Promise<void> {
+  await send("DELETE", `/trips/${tripId}`);
+}
+
+export async function saveTripData<T extends DataType>(
   tripId: string,
   type: T,
   data: TripDataMap[T]
 ): Promise<void> {
-  return put(`/trips/${tripId}/${type}`, data);
+  await send("PUT", `/trips/${tripId}/${type}`, data);
+}
+
+/**
+ * Drops this browser's cached API responses, so the next person on the device
+ * never sees them, then ends the Cloudflare Access session.
+ */
+export async function signOut(): Promise<void> {
+  try {
+    await caches.delete(API_CACHE);
+  } catch {
+    // Cache Storage is unavailable (e.g. insecure context); nothing to clear.
+  }
+  window.location.assign("/cdn-cgi/access/logout");
 }

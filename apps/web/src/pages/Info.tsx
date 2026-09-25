@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, InfoItem, InfoLink } from "../types";
-import { isDevMode, loadTripData, saveTripData } from "../dataSource";
-import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
+import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
+import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, ReadOnlyBanner } from "../components/editor";
 
 const EXT = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -25,8 +25,9 @@ const Info = () => {
   const { trip } = useOutletContext<{ trip: Trip }>();
   const [items, setItems] = useState<InfoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editable, setEditable] = useState(false);
 
-  /* Edit state (dev only) */
+  /* Edit state */
   const [editState, setEditState] = useState<EditState>(null);
   const [itemDraft, setItemDraft] = useState<ItemDraft>({ title: "", icon: "" });
   const [linkDraft, setLinkDraft] = useState<LinkDraft>({ label: "", url: "" });
@@ -35,7 +36,7 @@ const Info = () => {
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "info")
-      .then((data) => { setItems(data); setLoading(false); })
+      .then(({ data, editable }) => { setItems(data); setEditable(editable); setLoading(false); })
       .catch(console.error);
   }, [trip]);
 
@@ -138,13 +139,13 @@ const Info = () => {
 
   return (
     <div style={{ padding: "18px 18px 84px", background: "var(--bg)" }}>
-      {isDevMode && <DevBanner />}
+      {apiEnabled && !loading && !editable && <ReadOnlyBanner />}
 
       <div className="flex items-center justify-between mb-3.5">
         <div className="font-hand font-bold" style={{ fontSize: "1.6rem", color: "var(--ink)" }}>
           小筆記
         </div>
-        {isDevMode && <AddBtn onClick={openAddItem} label="新增類別" />}
+        {editable && <AddBtn onClick={openAddItem} label="新增類別" />}
       </div>
 
       {loading && (
@@ -186,7 +187,7 @@ const Info = () => {
             <div className="font-hand font-bold flex-1" style={{ fontSize: "1.4rem", lineHeight: 1, color: "var(--ink)" }}>
               {item.title}
             </div>
-            {isDevMode && (
+            {editable && (
               <div className="flex gap-0.5">
                 <EditBtn onClick={(e) => openEditItem(item, e)} />
                 <DeleteBtn onClick={(e) => handleDeleteItem(item.id, e)} />
@@ -226,7 +227,7 @@ const Info = () => {
                 <span className="truncate">{link.label}</span>
                 <span style={{ color: "var(--ink-faint)", flexShrink: 0, marginLeft: 8 }}>{EXT}</span>
               </a>
-              {isDevMode && (
+              {editable && (
                 <div className="flex gap-0.5 px-2 shrink-0">
                   <EditBtn onClick={(e) => openEditLink(item.id, idx, link, e)} />
                   <DeleteBtn onClick={(e) => handleDeleteLink(item.id, idx, e)} />
@@ -235,8 +236,8 @@ const Info = () => {
             </div>
           ))}
 
-          {/* Add link button (dev only) */}
-          {isDevMode && (
+          {/* Add link button */}
+          {editable && (
             <div
               className="flex justify-center py-2"
               style={{ borderTop: item.links.length > 0 ? "1px dashed var(--rule)" : "none" }}
@@ -247,8 +248,8 @@ const Info = () => {
         </div>
       ))}
 
-      {/* InfoItem modal (dev only) */}
-      {isDevMode && (
+      {/* InfoItem modal */}
+      {editable && (
         <>
           <EditModal
             title={modalTitle}

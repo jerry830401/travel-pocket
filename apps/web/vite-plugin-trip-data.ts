@@ -23,23 +23,13 @@ function toDataFile(urlPath: string): string | null {
   return null;
 }
 
-function listDataFiles(): string[] {
-  const files = ["trips.json"];
-  for (const entry of fs.readdirSync(TRIP_DATA_DIR, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !ID_PATTERN.test(entry.name)) continue;
-    for (const typeFile of TYPE_FILES) {
-      const file = `${entry.name}/${typeFile}`;
-      if (fs.existsSync(path.join(TRIP_DATA_DIR, file))) files.push(file);
-    }
-  }
-  return files;
-}
-
-// Publishes @travel-pocket/data at `${base}data/`: served from the package in
-// dev, emitted into dist/data/ at build time. The URLs match the old public/data/.
+// Serves @travel-pocket/data at `${base}data/` on the dev server only: it backs
+// `pnpm dev:web` and the fallback when the local API is down. Production builds
+// do not ship trip data; signed-in users read their own trips from the API.
 export function tripDataPlugin(): Plugin {
   return {
     name: "trip-data",
+    apply: "serve",
     configureServer(server) {
       server.middlewares.use(
         `${server.config.base}data`,
@@ -58,15 +48,6 @@ export function tripDataPlugin(): Plugin {
           }
         }
       );
-    },
-    generateBundle() {
-      for (const file of listDataFiles()) {
-        this.emitFile({
-          type: "asset",
-          fileName: `data/${file}`,
-          source: fs.readFileSync(path.join(TRIP_DATA_DIR, file), "utf-8"),
-        });
-      }
     },
   };
 }

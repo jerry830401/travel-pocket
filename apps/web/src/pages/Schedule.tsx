@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, ItineraryDay, ItineraryItem } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
-import { isDevMode, loadTripData, saveTripData } from "../dataSource";
-import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
+import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
+import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, ReadOnlyBanner } from "../components/editor";
 import { toMins, gapLabel, dateBig, weekday } from "./scheduleUtils";
 
 /* Category sticker data */
@@ -124,6 +124,7 @@ const Schedule = () => {
   const [direction, setDirection] = useState(1);
   const [selectedItem, setSelectedItem] = useState<{ item: ItineraryItem; day: ItineraryDay } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editable, setEditable] = useState(false);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   const dayBarRef = useRef<HTMLDivElement>(null);
@@ -131,13 +132,13 @@ const Schedule = () => {
   const touchStartY = useRef(0);
   const today = getTodayStr();
 
-  /* Edit state (dev only) */
+  /* Edit state */
   const [editTarget, setEditTarget] = useState<{ item: ItineraryItem; dayId: string } | null>(null);
   const [addDayId, setAddDayId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ItemDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
 
-  /* Day-level edit state (dev only) */
+  /* Day-level edit state */
   const [isAddingDay, setIsAddingDay] = useState(false);
   const [dayDraft, setDayDraft] = useState<DayDraft>({ date: "", day: "1" });
   const [savingDay, setSavingDay] = useState(false);
@@ -145,8 +146,9 @@ const Schedule = () => {
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "itinerary")
-      .then((data) => {
+      .then(({ data, editable }) => {
         setDays(data);
+        setEditable(editable);
         const ti = data.findIndex((d) => d.date === today);
         if (ti >= 0) setDayIdx(ti);
         setLoading(false);
@@ -317,7 +319,7 @@ const Schedule = () => {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {isDevMode && <DevBanner />}
+      {apiEnabled && !loading && !error && !editable && <ReadOnlyBanner />}
 
       {/* Day bar */}
       <div
@@ -356,7 +358,7 @@ const Schedule = () => {
           }
         </div>
         <div className="flex items-center gap-1.5 shrink-0 pr-3">
-          {isDevMode && !loading && (
+          {editable && !loading && (
             <AddBtn onClick={openAddDay} label="新增日" />
           )}
           {!loading && todayIdx >= 0 && todayIdx !== dayIdx && (
@@ -394,7 +396,7 @@ const Schedule = () => {
           <span className="font-mono flex-1" style={{ fontSize: ".7rem", color: "var(--ink-soft)", letterSpacing: ".18em" }}>
             {weekday(currentDay.date)} · DAY {currentDay.day}
           </span>
-          {isDevMode && (
+          {editable && (
             <DeleteBtn onClick={() => handleDeleteDay(currentDay.id)} />
           )}
         </div>
@@ -496,7 +498,7 @@ const Schedule = () => {
                     </div>
 
                     {/* Dev edit/delete buttons */}
-                    {isDevMode && (
+                    {editable && (
                       <div
                         className="absolute flex gap-0.5"
                         style={{ top: 6, right: 6 }}
@@ -530,8 +532,8 @@ const Schedule = () => {
               );
             })}
 
-            {/* Add item button (dev only) */}
-            {isDevMode && currentDay && (
+            {/* Add item button */}
+            {editable && currentDay && (
               <div className="flex justify-center pt-2 pb-1">
                 <AddBtn onClick={() => openAdd(currentDay.id)} label="新增行程" />
               </div>
@@ -658,8 +660,8 @@ const Schedule = () => {
         )}
       </AnimatePresence>
 
-      {/* Add day modal (dev only) */}
-      {isDevMode && (
+      {/* Add day modal */}
+      {editable && (
         <EditModal
           title="新增日"
           open={isAddingDay}
@@ -672,8 +674,8 @@ const Schedule = () => {
         </EditModal>
       )}
 
-      {/* Edit / Add item modal (dev only) */}
-      {isDevMode && (
+      {/* Edit / Add item modal */}
+      {editable && (
         <EditModal
           title={modalTitle}
           open={isEditing}

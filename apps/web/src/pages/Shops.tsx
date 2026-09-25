@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import type { Trip, Shop } from "../types";
-import { isDevMode, loadTripData, saveTripData } from "../dataSource";
-import { EditModal, FieldInput, FieldTags, EditBtn, DeleteBtn, AddBtn, DevBanner } from "../components/editor";
+import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
+import { EditModal, FieldInput, FieldTags, EditBtn, DeleteBtn, AddBtn, ReadOnlyBanner } from "../components/editor";
 
 const PIN_SVG = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -46,10 +46,11 @@ const Shops = () => {
   const [shops, setShops] = useState<Shop[]>([]);
   const [selectedTag, setSelectedTag] = useState("All");
   const [loading, setLoading] = useState(true);
+  const [editable, setEditable] = useState(false);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
 
-  /* Edit state (dev only) */
+  /* Edit state */
   const [editTarget, setEditTarget] = useState<Shop | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [draft, setDraft] = useState<ShopDraft>(emptyDraft());
@@ -58,7 +59,7 @@ const Shops = () => {
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "shops")
-      .then((data) => { setShops(data); setLoading(false); })
+      .then(({ data, editable }) => { setShops(data); setEditable(editable); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   }, [trip, retry]);
 
@@ -122,7 +123,7 @@ const Shops = () => {
 
   return (
     <div style={{ background: "var(--bg)" }}>
-      {isDevMode && <DevBanner />}
+      {apiEnabled && !loading && !error && !editable && <ReadOnlyBanner />}
 
       {/* Tag bar */}
       <div
@@ -230,7 +231,7 @@ const Shops = () => {
                   {shop.name}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {isDevMode && (
+                  {editable && (
                     <>
                       <EditBtn onClick={(e) => openEdit(shop, e)} />
                       <DeleteBtn onClick={(e) => handleDelete(shop.id, e)} />
@@ -284,16 +285,16 @@ const Shops = () => {
           );
         })}
 
-        {/* Add button (dev only) */}
-        {isDevMode && !loading && !error && (
+        {/* Add button */}
+        {editable && !loading && !error && (
           <div className="flex justify-center pt-2">
             <AddBtn onClick={openAdd} label="新增店家" />
           </div>
         )}
       </div>
 
-      {/* Edit / Add modal (dev only) */}
-      {isDevMode && (
+      {/* Edit / Add modal */}
+      {editable && (
         <EditModal
           title={modalTitle}
           open={isEditing}

@@ -1,9 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Trip } from "../types";
+import type { Me, NewTrip, Trip } from "../types";
 import { useTheme } from "../contexts/ThemeContext";
-import { isDevMode, loadTrips, saveTrips } from "../dataSource";
-import { EditModal, FieldInput, EditBtn, DevBanner } from "../components/editor";
+import {
+  apiEnabled,
+  createTrip,
+  deleteTrip,
+  loadMe,
+  loadTrips,
+  saveTrips,
+  signOut,
+} from "../dataSource";
+import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, ReadOnlyBanner } from "../components/editor";
 
 function seasonTag(startDate: string) {
   const m = parseInt(startDate.split("-")[1], 10);
@@ -31,6 +39,8 @@ type TripDraft = {
   snapshot: string;
 };
 
+const EMPTY_DRAFT: TripDraft = { name: "", startDate: "", endDate: "", coverImage: "", snapshot: "" };
+
 function tripToDraft(trip: Trip): TripDraft {
   return {
     name: trip.name,
@@ -41,23 +51,41 @@ function tripToDraft(trip: Trip): TripDraft {
   };
 }
 
+function draftToNewTrip(draft: TripDraft): NewTrip {
+  const trip: NewTrip = {
+    name: draft.name.trim(),
+    startDate: draft.startDate,
+    endDate: draft.endDate,
+    coverImage: draft.coverImage.trim(),
+  };
+  if (draft.snapshot.trim()) trip.snapshot = draft.snapshot.trim();
+  return trip;
+}
+
 const Home = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   const { theme, toggleTheme } = useTheme();
+  const [editable, setEditable] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
 
-  /* Edit state (dev only) */
+  /* Edit state */
   const [editTarget, setEditTarget] = useState<Trip | null>(null);
-  const [draft, setDraft] = useState<TripDraft>({ name: "", startDate: "", endDate: "", coverImage: "", snapshot: "" });
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<TripDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadTrips()
-      .then((data) => { setTrips(data); setLoading(false); })
+      .then(({ data, editable }) => { setTrips(data); setEditable(editable); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   }, [retry]);
+
+  useEffect(() => {
+    loadMe().then(setMe);
+  }, []);
 
   const openEdit = (trip: Trip, e: React.MouseEvent) => {
     e.preventDefault();
@@ -66,24 +94,52 @@ const Home = () => {
     setEditTarget(trip);
   };
 
-  const closeModal = () => setEditTarget(null);
+  const openAdd = () => {
+    setDraft(EMPTY_DRAFT);
+    setAdding(true);
+  };
+
+  const closeModal = () => {
+    setEditTarget(null);
+    setAdding(false);
+  };
 
   const handleSave = async () => {
-    if (!editTarget) return;
+    if (!draft.name.trim() || !draft.startDate || !draft.endDate) {
+      alert("請填寫旅行名稱與日期");
+      return;
+    }
     setSaving(true);
     try {
-      const next = trips.map((t) =>
-        t.id === editTarget.id
-          ? { ...t, ...draft, snapshot: draft.snapshot || undefined }
-          : t
-      );
-      setTrips(next);
-      await saveTrips(next);
+      if (adding) {
+        const created = await createTrip(draftToNewTrip(draft));
+        setTrips((prev) => [...prev, created]);
+      } else if (editTarget) {
+        const next = trips.map((t) =>
+          t.id === editTarget.id ? { ...draftToNewTrip(draft), id: t.id } : t
+        );
+        setTrips(next);
+        await saveTrips(next);
+      }
       closeModal();
     } catch (err) {
       alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Removes the trip only once the API has deleted it (with its itinerary,
+  // shops and info), so a failure leaves the list as it was.
+  const handleDelete = async (trip: Trip, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`確定要刪除「${trip.name}」？行程、店家和資訊會一起刪除。`)) return;
+    try {
+      await deleteTrip(trip.id);
+      setTrips((prev) => prev.filter((t) => t.id !== trip.id));
+    } catch (err) {
+      alert(`刪除失敗：${err instanceof Error ? err.message : err}`);
     }
   };
 
@@ -117,6 +173,27 @@ const Home = () => {
             <p className="font-hand italic mt-1" style={{ fontSize: "1.05rem", color: "var(--ink-soft)" }}>
               my little travel journal · 旅の記録
             </p>
+            {me && (
+              <p
+                className="font-mono flex items-center gap-2 mt-2"
+                style={{ fontSize: ".7rem", letterSpacing: ".04em", color: "var(--ink-soft)" }}
+              >
+                <span>{me.email}</span>
+                {/* Cloudflare Access handles sign-out; the dev server has no Access. */}
+                {!import.meta.env.DEV && (
+                  <button
+                    onClick={() => void signOut()}
+                    className="font-hand font-bold"
+                    style={{
+                      border: "none", background: "transparent", padding: 0,
+                      color: "var(--red)", fontSize: ".95rem", cursor: "pointer",
+                    }}
+                  >
+                    登出
+                  </button>
+                )}
+              </p>
+            )}
           </div>
           <button
             onClick={toggleTheme}
@@ -135,7 +212,7 @@ const Home = () => {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto scrollbar-hide dot-grid-bg px-4 pb-8 pt-5">
-        {isDevMode && <DevBanner />}
+        {apiEnabled && !loading && !error && !editable && <ReadOnlyBanner />}
 
         <div
           className="font-hand font-bold flex items-center gap-2.5 mb-4 mx-1"
@@ -191,6 +268,14 @@ const Home = () => {
           </>
         )}
 
+        {/* Empty state: a new account starts without trips */}
+        {!loading && !error && trips.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 font-hand" style={{ color: "var(--ink-soft)" }}>
+            <span style={{ fontSize: "2.4rem" }}>🧳</span>
+            <p style={{ fontSize: "1.1rem" }}>還沒有旅行筆記</p>
+          </div>
+        )}
+
         {/* Trip cards */}
         {!loading && !error && trips.map((trip, i) => {
           const w = WASHI[i % WASHI.length];
@@ -229,14 +314,15 @@ const Home = () => {
                   transform: "rotate(8deg)", boxShadow: "0 2px 4px rgba(40,30,20,.18)",
                 }} />
 
-                {/* Dev edit button */}
-                {isDevMode && (
+                {/* Edit / delete buttons, left of the → circle */}
+                {editable && (
                   <div
-                    className="absolute z-10"
-                    style={{ bottom: 14, right: 14 }}
+                    className="absolute z-10 flex gap-0.5"
+                    style={{ bottom: 24, right: 58 }}
                     onClick={(e) => e.preventDefault()}
                   >
                     <EditBtn onClick={(e) => openEdit(trip, e)} />
+                    <DeleteBtn onClick={(e) => handleDelete(trip, e)} />
                   </div>
                 )}
 
@@ -290,13 +376,19 @@ const Home = () => {
             </Link>
           );
         })}
+
+        {editable && !loading && !error && (
+          <div className="flex justify-center">
+            <AddBtn onClick={openAdd} label="新增旅程" />
+          </div>
+        )}
       </div>
 
-      {/* Edit modal (dev only) */}
-      {isDevMode && (
+      {/* Add / edit modal */}
+      {editable && (
         <EditModal
-          title="編輯旅行"
-          open={Boolean(editTarget)}
+          title={adding ? "新增旅行" : "編輯旅行"}
+          open={adding || Boolean(editTarget)}
           onClose={closeModal}
           onSave={handleSave}
           saving={saving}

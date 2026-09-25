@@ -279,10 +279,12 @@ export function AddBtn({ onClick, label }: AddBtnProps) {
   );
 }
 
-/* Dev-mode banner (visible reminder that edit mode is active) */
-export function DevBanner() {
+/* Read-only banner: the data on screen is a fallback or cached copy, so the
+   edit controls are hidden (see Loaded.editable in dataSource.ts). */
+export function ReadOnlyBanner() {
   return (
     <div
+      role="status"
       className="font-mono text-center"
       style={{
         fontSize: ".65rem", letterSpacing: ".14em",
@@ -295,7 +297,7 @@ export function DevBanner() {
         color: "var(--red)",
       }}
     >
-      ✏ DEV EDIT MODE
+      ⚠ 離線資料・暫時無法編輯
     </div>
   );
 }

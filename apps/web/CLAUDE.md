@@ -30,36 +30,45 @@ Uses **HashRouter** (not BrowserRouter) — required for GitHub Pages static hos
 
 ## Data
 
+Users sign in with Google through Cloudflare Access, which sits in front of the whole site, so the app has no sign-in screen. The API sees the Access cookie on every same-origin request and returns only that user's trips; the app never sends a token.
+
 Pages never call `fetch` for trip data themselves; they go through `src/dataSource.ts`:
 
-- `loadTrips()` / `loadTripData(tripId, type)` — with `VITE_API_URL` set, read from the API and fall back to the static JSON when the request fails; without it, read the static JSON only.
-- `saveTrips(trips)` / `saveTripData(tripId, type, data)` — `PUT` to the API with `Authorization: Bearer ${VITE_ADMIN_TOKEN}`; no-ops unless `isDevMode`.
-- `isDevMode` (`import.meta.env.DEV && apiEnabled`) gates every edit control (`isDevMode && …`).
+- `loadTrips()` / `loadTripData(tripId, type)` resolve to `{ data, editable }`. With `VITE_API_URL` set they read the API; on the dev server a failed request falls back to the static JSON, while production builds (which ship no trip JSON) surface the error. Without `VITE_API_URL` they read the static JSON only.
+- `editable` is true only for data read live from the API. The static fallback is never editable, and neither is a response the service worker answered from its cache (it marks those with the `X-Travel-Pocket-Cache` header, see [Offline](#offline)). Saves replace whole lists, so editing an old copy could overwrite newer data.
+- Each page keeps its own `editable` state from its load and gates every edit control on it. `apiEnabled && !editable` (once loaded) shows `ReadOnlyBanner` to explain why the controls are gone.
+- Writes: `saveTrips`, `saveTripData` (`PUT`), `createTrip` (`POST`, the server assigns the id) and `deleteTrip` (`DELETE`, which also removes the trip's itinerary, shops and info). All of them reject when there is no API.
+- `loadMe()` returns the signed-in `Me`, or null. `signOut()` clears the `trip-api` cache and goes to `/cdn-cgi/access/logout`. Home shows the email, and shows 登出 outside the dev server, which has no Access.
 
 | Command | Data source | Editable |
 |---|---|---|
 | `pnpm dev:web` (web `dev`) | Static JSON | No |
-| `pnpm dev` (web `dev:fullstack` + API) | Local API (Vite proxies `/api` → wrangler on `:8787`), static JSON when it fails | Yes, writes to the local D1 |
-| Production build | API when `VITE_API_URL` is set at build time, otherwise static JSON | No |
+| `pnpm dev` (web `dev:fullstack` + API) | Local API (Vite proxies `/api` → wrangler on `:8787`, signed in as the API's dev user), static JSON when it fails | Yes, writes to the local D1 |
+| Production build | The API (`VITE_API_URL`) | Yes, for the signed-in user |
 
-`.env.fullstack` (committed) sets `VITE_API_URL=/api` and `VITE_ADMIN_TOKEN=dev-token`. Only `vite --mode fullstack` loads it, so the token never reaches a production build. The API itself is `apps/api`; talk to it only over HTTP using the contract types from `@travel-pocket/shared`. Before the first `pnpm dev`, set up the local D1 as described in [apps/api/CLAUDE.md](../api/CLAUDE.md) (`.dev.vars`, `db:migrate:local`, `db:seed`).
+`.env.fullstack` (committed) sets `VITE_API_URL=/api`; only `vite --mode fullstack` loads it. The API itself is `apps/api`; talk to it only over HTTP using the contract types from `@travel-pocket/shared`. Before the first `pnpm dev`, set up the local D1 as described in [apps/api/CLAUDE.md](../api/CLAUDE.md) (`db:migrate:local`, then `db:seed --owner dev@example.com`).
 
 ### Static JSON
 
-The static trip data is fetched from `${BASE_URL}data/`. The JSON files live in the `@travel-pocket/data` package ([packages/data/](../../packages/data/CLAUDE.md)), not in this app:
+On the dev server only, the static trip data is served from `${BASE_URL}data/`. The JSON files live in the `@travel-pocket/data` package ([packages/data/](../../packages/data/CLAUDE.md)), not in this app:
 
 - `trips.json` — Array of `Trip` metadata (id, name, dates, cover image, snapshot path)
 - `{tripId}/itinerary.json` — `ItineraryDay[]` (array of days, each with `ItineraryItem[]`)
 - `{tripId}/shops.json` — `Shop[]`
 - `{tripId}/info.json` — `InfoItem[]`
 
-`vite-plugin-trip-data.ts` publishes them at `data/`: the dev server reads them straight from the package, and the build emits them into `dist/data/`. Only files that follow the contract layout (`ID_PATTERN` folders, `DATA_TYPES` file names) are published. Snapshot images are web-only assets and stay in `public/data/{tripId}/snapshot.jpg`; both end up under the same `data/` URL.
+`vite-plugin-trip-data.ts` (`apply: "serve"`) serves them at `data/` straight from the package. It backs `pnpm dev:web`, the E2E tests and the dev-server fallback. Production builds do not include them: the trips are private to their owners, and `packages/data` only seeds an account (`db:seed --owner`). Only files that follow the contract layout (`ID_PATTERN` folders, `DATA_TYPES` file names) are served. Snapshot images are web-only assets and stay in `public/data/{tripId}/snapshot.jpg`, which the build still copies.
 
-To add a new trip: add its JSON files to `packages/data/` (see that package's `CLAUDE.md`) and, optionally, a snapshot image under `public/data/{tripId}/`. No code changes are needed unless new data fields are introduced.
+New trips are created in the app (首頁 → 新增旅程). The JSON in `packages/data/` is sample data for local development.
 
 Data types come from `@travel-pocket/shared`; `src/types.ts` re-exports them so app code keeps importing from `../types`. New fields go into `packages/shared/src/types.ts`, not into this app.
 
 Edits made in the browser go to the local D1, never back into `packages/data/`.
+
+## Offline
+
+- The service worker (`vite-plugin-pwa`, `generateSW`) caches GET `/api/` responses in `trip-api` (`NetworkFirst`, 7 days). When the network fails it answers from that cache and adds `X-Travel-Pocket-Cache: 1` (a `cachedResponseWillBeUsed` plugin in `vite.config.ts`), so `dataSource.ts` reports the data as not editable. The plugin is serialized into the service worker, so it repeats the header name instead of importing `SW_CACHE_HEADER`.
+- `signOut()` deletes `trip-api`, so the next person on the same device never sees the previous user's trips.
 
 ## Theming
 
@@ -73,7 +82,7 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 | `date-fns` | Time formatting and duration calculations in `Schedule.tsx` |
 | `lucide-react` | Category icons mapped by `ItineraryItem.category` string |
 | `clsx` | Conditional className construction |
-| `vite-plugin-pwa` | Service worker, offline caching (`NetworkFirst`, 7-day expiry for the data JSON and for GET `/api/` responses) |
+| `vite-plugin-pwa` | Service worker, offline caching of GET `/api/` responses (see [Offline](#offline)) |
 
 ## Testing
 
@@ -84,6 +93,7 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 
 - Vitest setup file is at `src/test/setup.ts` — patches `matchMedia` for jsdom and runs `cleanup` after each test
 - Unit tests run without `VITE_API_URL`, so page tests exercise the static path by spying on `globalThis.fetch`. `src/dataSource.test.ts` covers API mode with `vi.stubEnv` plus a fresh `import()` after `vi.resetModules()`, because `dataSource.ts` reads `import.meta.env` at load time
+- `src/pages/Home.account.test.tsx` covers Home as a signed-in user (account line, add / delete trip, empty state, read-only data) by mocking `../dataSource` at the module boundary
 - E2E tests run against the dev server at `http://localhost:5173/travel-pocket/`; Playwright starts it automatically via `webServer` in `playwright.config.ts`. That is web's own `pnpm dev` (static mode), so E2E never needs the API
 
 ## Build & Deploy

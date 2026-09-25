@@ -8,32 +8,31 @@ async function importDataSource(env: Record<string, string> = {}) {
   return import("./dataSource");
 }
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
+function jsonResponse(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(data), {
     status,
-    json: () => Promise.resolve(data),
-  } as Response;
+    headers: { "Content-Type": "application/json", ...headers },
+  });
 }
 
 const staticUrl = (path: string) => `${import.meta.env.BASE_URL}data/${path}`;
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe("靜態模式（沒有 VITE_API_URL）", () => {
-  it("不啟用 API 也不開放編輯", async () => {
+  it("不啟用 API", async () => {
     const ds = await importDataSource();
     expect(ds.apiEnabled).toBe(false);
-    expect(ds.isDevMode).toBe(false);
   });
 
-  it("loadTrips 讀取靜態 trips.json", async () => {
+  it("loadTrips 讀取靜態 trips.json，且不可編輯", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([{ id: "t1" }]));
     const ds = await importDataSource();
 
-    await expect(ds.loadTrips()).resolves.toEqual([{ id: "t1" }]);
+    await expect(ds.loadTrips()).resolves.toEqual({ data: [{ id: "t1" }], editable: false });
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledWith(staticUrl("trips.json"));
   });
@@ -42,7 +41,10 @@ describe("靜態模式（沒有 VITE_API_URL）", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([]));
     const ds = await importDataSource();
 
-    await ds.loadTripData("kyushu-2024", "itinerary");
+    await expect(ds.loadTripData("kyushu-2024", "itinerary")).resolves.toEqual({
+      data: [],
+      editable: false,
+    });
     expect(fetchSpy).toHaveBeenCalledWith(staticUrl("kyushu-2024/itinerary.json"));
   });
 
@@ -53,72 +55,111 @@ describe("靜態模式（沒有 VITE_API_URL）", () => {
     await expect(ds.loadTrips()).rejects.toThrow("404");
   });
 
-  it("儲存時不送出任何請求", async () => {
+  it("沒有帳號可讀，也不送出請求", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const ds = await importDataSource();
 
-    await ds.saveTrips([]);
-    await ds.saveTripData("kyushu-2024", "shops", []);
+    await expect(ds.loadMe()).resolves.toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("所有寫入都失敗，且不送出請求", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const ds = await importDataSource();
+
+    await expect(ds.saveTrips([])).rejects.toThrow();
+    await expect(ds.saveTripData("kyushu-2024", "shops", [])).rejects.toThrow();
+    await expect(
+      ds.createTrip({ name: "x", startDate: "2026-01-01", endDate: "2026-01-02", coverImage: "" })
+    ).rejects.toThrow();
+    await expect(ds.deleteTrip("kyushu-2024")).rejects.toThrow();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 
 describe("API 模式", () => {
-  const apiEnv = { VITE_API_URL: "/api", VITE_ADMIN_TOKEN: "dev-token" };
+  const apiEnv = { VITE_API_URL: "/api" };
 
-  it("dev server 上啟用 API 並開放編輯", async () => {
+  it("啟用 API", async () => {
     const ds = await importDataSource(apiEnv);
     expect(ds.apiEnabled).toBe(true);
-    expect(ds.isDevMode).toBe(true);
   });
 
-  it("正式 build 讀 API 但不開放編輯", async () => {
-    vi.stubEnv("DEV", false);
-    const ds = await importDataSource(apiEnv);
-    expect(ds.apiEnabled).toBe(true);
-    expect(ds.isDevMode).toBe(false);
-  });
-
-  it("loadTrips 從 API 讀取", async () => {
+  it("從 API 讀到的資料可以編輯", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([{ id: "t1" }]));
     const ds = await importDataSource(apiEnv);
 
-    await expect(ds.loadTrips()).resolves.toEqual([{ id: "t1" }]);
+    await expect(ds.loadTrips()).resolves.toEqual({ data: [{ id: "t1" }], editable: true });
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledWith("/api/trips");
   });
 
   it("loadTripData 從 API 讀取，並去掉 VITE_API_URL 結尾的斜線", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([]));
-    const ds = await importDataSource({ ...apiEnv, VITE_API_URL: "https://api.example.com/api/" });
+    const ds = await importDataSource({ VITE_API_URL: "https://api.example.com/api/" });
 
     await ds.loadTripData("kyushu-2024", "shops");
     expect(fetchSpy).toHaveBeenCalledWith("https://api.example.com/api/trips/kyushu-2024/shops");
   });
 
-  it("API 回應非 ok 時退回靜態 JSON", async () => {
+  it("service worker 從快取回應時不可編輯", async () => {
+    const cached = jsonResponse([{ id: "t1" }], 200, { "X-Travel-Pocket-Cache": "1" });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(cached);
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.loadTrips()).resolves.toEqual({ data: [{ id: "t1" }], editable: false });
+  });
+
+  it("dev server 上 API 回應非 ok 時退回靜態 JSON，且不可編輯", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse({ error: "Internal Server Error" }, 500))
       .mockResolvedValueOnce(jsonResponse([{ id: "static" }]));
     const ds = await importDataSource(apiEnv);
 
-    await expect(ds.loadTripData("kyushu-2024", "shops")).resolves.toEqual([{ id: "static" }]);
+    await expect(ds.loadTripData("kyushu-2024", "shops")).resolves.toEqual({
+      data: [{ id: "static" }],
+      editable: false,
+    });
     expect(fetchSpy).toHaveBeenLastCalledWith(staticUrl("kyushu-2024/shops.json"));
   });
 
-  it("API 連不上時退回靜態 JSON", async () => {
+  it("dev server 上 API 連不上時退回靜態 JSON，且不可編輯", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
       .mockResolvedValueOnce(jsonResponse([{ id: "static" }]));
     const ds = await importDataSource(apiEnv);
 
-    await expect(ds.loadTrips()).resolves.toEqual([{ id: "static" }]);
+    await expect(ds.loadTrips()).resolves.toEqual({ data: [{ id: "static" }], editable: false });
     expect(fetchSpy).toHaveBeenLastCalledWith(staticUrl("trips.json"));
   });
 
-  it("saveTripData 送出帶 Bearer token 的 PUT", async () => {
+  it("正式 build 不退回靜態 JSON，直接拋出錯誤", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+    vi.stubEnv("DEV", false);
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.loadTrips()).rejects.toThrow("Failed to fetch");
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+
+  it("loadMe 回傳目前登入的帳號", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ email: "a@b.c" }));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.loadMe()).resolves.toEqual({ email: "a@b.c" });
+    expect(fetchSpy).toHaveBeenCalledWith("/api/me");
+  });
+
+  it("loadMe 讀不到時回傳 null", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ error: "Sign in required" }, 401));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.loadMe()).resolves.toBeNull();
+  });
+
+  it("saveTripData 送出 PUT，不帶 Authorization（身分來自 Access 的 cookie）", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ ok: true }));
     const ds = await importDataSource(apiEnv);
 
@@ -127,7 +168,7 @@ describe("API 模式", () => {
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/trips/kyushu-2024/itinerary", {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
   });
@@ -140,30 +181,51 @@ describe("API 模式", () => {
     expect(fetchSpy).toHaveBeenCalledWith("/api/trips", expect.objectContaining({ method: "PUT" }));
   });
 
-  it("儲存回應非 ok 時拋出伺服器的錯誤訊息", async () => {
+  it("createTrip 送出 POST /trips，回傳伺服器建立的旅程", async () => {
+    const newTrip = { name: "東京", startDate: "2026-10-01", endDate: "2026-10-05", coverImage: "" };
+    const created = { ...newTrip, id: "abc123" };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(created, 201));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.createTrip(newTrip)).resolves.toEqual(created);
+    expect(fetchSpy).toHaveBeenCalledWith("/api/trips", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newTrip),
+    });
+  });
+
+  it("deleteTrip 送出沒有 body 的 DELETE", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ ok: true }));
+    const ds = await importDataSource(apiEnv);
+
+    await ds.deleteTrip("kyushu-2024");
+    expect(fetchSpy).toHaveBeenCalledWith("/api/trips/kyushu-2024", { method: "DELETE" });
+  });
+
+  it("寫入回應非 ok 時拋出伺服器的錯誤訊息", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ error: "Trip not found" }, 404));
     const ds = await importDataSource(apiEnv);
 
     await expect(ds.saveTripData("nope", "shops", [])).rejects.toThrow("Trip not found");
   });
 
-  it("儲存回應非 ok 且 body 不是 JSON 時拋出 HTTP 狀態碼", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: () => Promise.reject(new SyntaxError("Unexpected token")),
-    } as Response);
+  it("寫入回應非 ok 且 body 不是 JSON 時拋出 HTTP 狀態碼", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("Unauthorized", { status: 401 }));
     const ds = await importDataSource(apiEnv);
 
-    await expect(ds.saveTrips([])).rejects.toThrow("HTTP 401");
+    await expect(ds.deleteTrip("kyushu-2024")).rejects.toThrow("HTTP 401");
   });
+});
 
-  it("正式 build 儲存時不送出任何請求", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    vi.stubEnv("DEV", false);
-    const ds = await importDataSource(apiEnv);
+describe("signOut", () => {
+  // jsdom cannot navigate, so only the cache clearing is checked here.
+  it("清除 service worker 的 API 快取", async () => {
+    const deleteCache = vi.fn().mockResolvedValue(true);
+    vi.stubGlobal("caches", { delete: deleteCache });
+    const ds = await importDataSource({ VITE_API_URL: "/api" });
 
-    await ds.saveTrips([]);
-    expect(fetchSpy).not.toHaveBeenCalled();
+    await ds.signOut();
+    expect(deleteCache).toHaveBeenCalledWith("trip-api");
   });
 });
