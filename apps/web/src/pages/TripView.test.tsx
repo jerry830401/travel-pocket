@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import TripView from "./TripView";
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
+import { MemoryRouter, Routes, Route, useOutletContext } from "react-router-dom";
+import TripView, { type TripOutletContext } from "./TripView";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import type { Trip } from "../types";
 
@@ -18,15 +20,31 @@ const mockTrips: Trip[] = [
 
 const MockChild = () => <div>child content</div>;
 
-function renderAt(path: string) {
+/** A tab page that puts a button into the header, like the pages' EditControls. */
+const SlotChild = () => {
+  const { editSlot } = useOutletContext<TripOutletContext>();
+  return editSlot ? createPortal(<button>slot button</button>, editSlot) : null;
+};
+
+/** A tab page in edit mode, which locks the navigation. */
+const LockingChild = () => {
+  const { setNavLocked } = useOutletContext<TripOutletContext>();
+  useEffect(() => {
+    setNavLocked(true);
+    return () => setNavLocked(false);
+  }, [setNavLocked]);
+  return <div>editing child</div>;
+};
+
+function renderAt(path: string, child = <MockChild />) {
   return render(
     <ThemeProvider>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/trip/:tripId" element={<TripView />}>
-            <Route path="schedule" element={<MockChild />} />
-            <Route path="shops" element={<MockChild />} />
-            <Route path="info" element={<MockChild />} />
+            <Route path="schedule" element={child} />
+            <Route path="shops" element={child} />
+            <Route path="info" element={child} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -110,6 +128,28 @@ describe("TripView", () => {
       const back = screen.getByRole("link", { name: "‹" });
       expect(back).toHaveAttribute("href", "/");
     });
+  });
+
+  it("分頁可把按鈕放進 header，位在主題按鈕左邊", async () => {
+    renderAt("/trip/trip-kyushu/schedule", <SlotChild />);
+    const slotButton = await screen.findByRole("button", { name: "slot button" });
+    expect(screen.getByRole("banner")).toContainElement(slotButton);
+    expect(
+      slotButton.compareDocumentPosition(screen.getByRole("button", { name: "切換主題" })) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it("分頁在編輯模式時停用返回與底部分頁", async () => {
+    renderAt("/trip/trip-kyushu/schedule", <LockingChild />);
+    await screen.findByText("editing child");
+
+    for (const name of ["‹", "日程", "購物", "資訊"]) {
+      const link = screen.getByRole("link", { name });
+      expect(link).toHaveAttribute("aria-disabled", "true");
+      // fireEvent returns false when the click was prevented.
+      expect(fireEvent.click(link)).toBe(false);
+    }
   });
 
   it("主題切換按鈕可切換深色模式", async () => {
