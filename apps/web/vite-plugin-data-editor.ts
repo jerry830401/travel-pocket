@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { DATA_TYPES, ID_PATTERN } from "@travel-pocket/shared";
+import { TRIP_DATA_DIR } from "./vite-plugin-trip-data";
 
 const ALLOWED_TYPES = new Set<string>(DATA_TYPES);
 
@@ -47,14 +48,11 @@ function writeJson(
 }
 
 export function dataEditorPlugin(): Plugin {
-  let dataDir: string;
+  const dataDir = TRIP_DATA_DIR;
 
   return {
     name: "data-editor",
     apply: "serve",
-    configResolved(config) {
-      dataDir = path.resolve(config.root, "public", "data");
-    },
     configureServer(server) {
       server.middlewares.use(
         "/api/data",
@@ -64,7 +62,7 @@ export function dataEditorPlugin(): Plugin {
             .split("/")
             .filter(Boolean);
 
-          // GET/POST /api/data/trips  →  public/data/trips.json
+          // GET/POST /api/data/trips  →  @travel-pocket/data/trips.json
           if (parts.length === 1 && parts[0] === "trips") {
             const filePath = safePath(dataDir, "trips");
             if (!filePath) {
@@ -76,7 +74,7 @@ export function dataEditorPlugin(): Plugin {
             if (req.method === "POST") return writeJson(req, res, filePath);
           }
 
-          // GET/POST /api/data/:tripId/:type  →  public/data/:tripId/:type.json
+          // GET/POST /api/data/:tripId/:type  →  @travel-pocket/data/:tripId/:type.json
           if (parts.length === 2 && ALLOWED_TYPES.has(parts[1])) {
             const filePath = safePath(dataDir, parts[0], parts[1]);
             if (!filePath) {

@@ -1,0 +1,9 @@
+{
+  "name": "@travel-pocket/data",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./*.json": "./*.json"
+  }
+}

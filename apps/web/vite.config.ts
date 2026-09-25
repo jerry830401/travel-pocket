@@ -2,11 +2,13 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { dataEditorPlugin } from "./vite-plugin-data-editor";
+import { tripDataPlugin } from "./vite-plugin-trip-data";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     dataEditorPlugin(),
+    tripDataPlugin(),
     react(),
     VitePWA({
       registerType: "prompt",

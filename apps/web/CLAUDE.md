@@ -29,18 +29,20 @@ Uses **HashRouter** (not BrowserRouter) — required for GitHub Pages static hos
 
 ## Data
 
-All trip data is **static JSON** fetched at runtime from `public/data/`:
+All trip data is **static JSON** fetched at runtime from `${BASE_URL}data/`. The JSON files live in the `@travel-pocket/data` package ([packages/data/](../../packages/data/CLAUDE.md)), not in this app:
 
 - `trips.json` — Array of `Trip` metadata (id, name, dates, cover image, snapshot path)
 - `{tripId}/itinerary.json` — `ItineraryDay[]` (array of days, each with `ItineraryItem[]`)
 - `{tripId}/shops.json` — `Shop[]`
 - `{tripId}/info.json` — `InfoItem[]`
 
-To add a new trip: add its folder under `public/data/`, populate the three JSON files, then add an entry to `trips.json`. No code changes are needed unless new data fields are introduced.
+`vite-plugin-trip-data.ts` publishes them at `data/`: the dev server reads them straight from the package, and the build emits them into `dist/data/`. Only files that follow the contract layout (`ID_PATTERN` folders, `DATA_TYPES` file names) are published. Snapshot images are web-only assets and stay in `public/data/{tripId}/snapshot.jpg`; both end up under the same `data/` URL.
+
+To add a new trip: add its JSON files to `packages/data/` (see that package's `CLAUDE.md`) and, optionally, a snapshot image under `public/data/{tripId}/`. No code changes are needed unless new data fields are introduced.
 
 Data types come from `@travel-pocket/shared`; `src/types.ts` re-exports them so app code keeps importing from `../types`. New fields go into `packages/shared/src/types.ts`, not into this app.
 
-`vite-plugin-data-editor.ts` is a dev-server-only plugin (`apply: "serve"`) that exposes `GET`/`POST /api/data/trips` and `/api/data/{tripId}/{type}` to read and write the JSON files under `public/data/`; `src/hooks/useDataEditor.ts` is its client. It is not part of the production build.
+`vite-plugin-data-editor.ts` is a dev-server-only plugin (`apply: "serve"`) that exposes `GET`/`POST /api/data/trips` and `/api/data/{tripId}/{type}` to read and write the JSON files in `packages/data/`; `src/hooks/useDataEditor.ts` is its client. It is not part of the production build.
 
 ## Theming
 
@@ -72,4 +74,4 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 - TypeScript strict mode is on (`noUnusedLocals`, `noUnusedParameters`)
 - Tailwind typography plugin is used for markdown-style content in `Info.tsx`
 - Mobile-first layout: main container is capped at `max-width: 480px`
-- `.github/workflows/deploy.yml` (at the repo root) builds and publishes `dist/` to GitHub Pages on pushes to `master` that touch `apps/web/`, `packages/shared/`, or root workspace files
+- `.github/workflows/deploy.yml` (at the repo root) builds and publishes `dist/` to GitHub Pages on pushes to `master` that touch `apps/web/`, `packages/shared/`, `packages/data/`, or root workspace files
