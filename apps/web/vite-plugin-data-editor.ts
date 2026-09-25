@@ -2,13 +2,13 @@ import type { Plugin } from "vite";
 import fs from "node:fs";
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { DATA_TYPES, ID_PATTERN } from "@travel-pocket/shared";
 
-const ALLOWED_TYPES = new Set(["itinerary", "shops", "info"]);
-const ALLOWED_SEGMENT = /^[a-zA-Z0-9_-]+$/;
+const ALLOWED_TYPES = new Set<string>(DATA_TYPES);
 
 function safePath(dataDir: string, ...parts: string[]): string | null {
   for (const p of parts) {
-    if (!ALLOWED_SEGMENT.test(p)) return null;
+    if (!ID_PATTERN.test(p)) return null;
   }
   const resolved = path.resolve(dataDir, ...parts) + ".json";
   if (!resolved.startsWith(dataDir)) return null;

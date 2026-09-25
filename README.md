@@ -72,6 +72,11 @@ pnpm -F @travel-pocket/web run deploy     # build 後以 gh-pages 推送 dist/�
 ├── package.json                   # workspace 根目錄：只放腳本與 packageManager
 ├── pnpm-workspace.yaml            # workspace 範圍：apps/*、packages/*
 ├── docs/                          # 需求文件與套件說明
+├── packages/
+│   └── shared/                    # 共用型別與 API 契約常數（@travel-pocket/shared）
+│       └── src/
+│           ├── types.ts           # 所有資料結構的 TypeScript 介面
+│           └── contract.ts        # DATA_TYPES、ID_PATTERN、TripDataMap
 └── apps/
     └── web/                       # 前端（@travel-pocket/web）
         ├── e2e/                   # Playwright E2E 測試
@@ -90,7 +95,7 @@ pnpm -F @travel-pocket/web run deploy     # build 後以 gh-pages 推送 dist/�
         ├── src/
         │   ├── App.tsx            # 路由定義與外層容器
         │   ├── main.tsx           # 進入點
-        │   ├── types.ts           # 所有資料結構的 TypeScript 介面
+        │   ├── types.ts           # 轉出 @travel-pocket/shared 的型別
         │   ├── pages/
         │   │   ├── Home.tsx       # 旅程選擇首頁
         │   │   ├── TripView.tsx   # 巢狀路由的 layout shell，負責抓資料
@@ -126,7 +131,7 @@ pnpm -F @travel-pocket/web run deploy     # build 後以 gh-pages 推送 dist/�
 
 ## 資料
 
-所有資料都是 `apps/web/public/data/` 底下的靜態 JSON，在執行期以 fetch 取得，沒有後端。型別定義見 [`apps/web/src/types.ts`](apps/web/src/types.ts)。
+所有資料都是 `apps/web/public/data/` 底下的靜態 JSON，在執行期以 fetch 取得，沒有後端。型別定義見 [`packages/shared/src/types.ts`](packages/shared/src/types.ts)。
 
 ### 新增一趟旅程
 
