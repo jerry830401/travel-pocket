@@ -2,16 +2,17 @@ import { motion, AnimatePresence } from "framer-motion";
 
 /* ── Modal wrapper ──────────────────────────────────────────────── */
 
+/* 確定 only updates the page's draft; the page's 完成 saves it (see
+   useEditSession). */
 interface EditModalProps {
   title: string;
   open: boolean;
   onClose: () => void;
   onSave: () => void;
-  saving?: boolean;
   children: React.ReactNode;
 }
 
-export function EditModal({ title, open, onClose, onSave, saving, children }: EditModalProps) {
+export function EditModal({ title, open, onClose, onSave, children }: EditModalProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -82,17 +83,15 @@ export function EditModal({ title, open, onClose, onSave, saving, children }: Ed
               </button>
               <button
                 onClick={onSave}
-                disabled={saving}
                 style={{
                   flex: 2, padding: "10px 0", borderRadius: 12,
                   border: "1.5px solid var(--red)",
                   background: "var(--red)", color: "#fff",
                   fontFamily: "inherit", fontSize: ".95rem", fontWeight: 700,
-                  cursor: saving ? "not-allowed" : "pointer",
-                  opacity: saving ? .6 : 1,
+                  cursor: "pointer",
                 }}
               >
-                {saving ? "儲存中…" : "儲存"}
+                確定
               </button>
             </div>
           </motion.div>
@@ -276,6 +275,70 @@ export function AddBtn({ onClick, label }: AddBtnProps) {
       </svg>
       {label ?? "新增"}
     </button>
+  );
+}
+
+/* Edit-mode controls, next to the theme button: 編輯 in view mode; 取消 and
+   完成 while editing (see useEditSession). */
+interface EditControlsProps {
+  editing: boolean;
+  saving: boolean;
+  onStart: () => void;
+  onCancel: () => void;
+  onFinish: () => void;
+}
+
+const pillBtn: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 6,
+  padding: "4px 12px", borderRadius: 14,
+  border: "1.5px solid var(--ink)",
+  fontSize: ".9rem", cursor: "pointer", whiteSpace: "nowrap",
+};
+
+export function EditControls({ editing, saving, onStart, onCancel, onFinish }: EditControlsProps) {
+  if (!editing) {
+    return (
+      <button
+        onClick={onStart}
+        className="font-hand font-bold shrink-0"
+        style={{ ...pillBtn, background: "transparent", color: "var(--ink)" }}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        編輯
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <button
+        onClick={onCancel}
+        disabled={saving}
+        className="font-hand font-bold"
+        style={{
+          border: "none", background: "transparent", color: "var(--ink-soft)",
+          padding: "4px 8px", fontSize: ".9rem", whiteSpace: "nowrap",
+          cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .5 : 1,
+        }}
+      >
+        取消
+      </button>
+      <button
+        onClick={onFinish}
+        disabled={saving}
+        className="font-hand font-bold"
+        style={{
+          ...pillBtn, background: "var(--ink)", color: "var(--paper)",
+          cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .6 : 1,
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        {saving ? "儲存中…" : "完成"}
+      </button>
+    </div>
   );
 }
 

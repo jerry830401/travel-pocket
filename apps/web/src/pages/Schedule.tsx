@@ -1,9 +1,12 @@
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useOutletContext } from "react-router-dom";
-import type { Trip, ItineraryDay, ItineraryItem } from "../types";
+import type { ItineraryDay, ItineraryItem } from "../types";
+import type { TripOutletContext } from "./TripView";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
-import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, ReadOnlyBanner } from "../components/editor";
+import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
+import { useEditSession } from "../components/editor/useEditSession";
 import { toMins, gapLabel, dateBig, weekday } from "./scheduleUtils";
 
 /* Category sticker data */
@@ -118,13 +121,24 @@ function nextDateStr(dateStr: string): string {
 /* ─────────────────────────────────────────────────────────────── */
 
 const Schedule = () => {
-  const { trip } = useOutletContext<{ trip: Trip }>();
-  const [days, setDays] = useState<ItineraryDay[]>([]);
-  const [dayIdx, setDayIdx] = useState(0);
+  const { trip, editSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const session = useEditSession<ItineraryDay[]>(
+    [],
+    async (next) => {
+      await saveTripData(trip.id, "itinerary", next);
+      return next;
+    },
+    setNavLocked
+  );
+  const { data: days, setData: setDays, load } = session;
+  const [selectedDayIdx, setDayIdx] = useState(0);
+  // Kept in range: 取消 can drop a day added in edit mode while it is selected.
+  const dayIdx = Math.min(selectedDayIdx, Math.max(0, days.length - 1));
   const [direction, setDirection] = useState(1);
   const [selectedItem, setSelectedItem] = useState<{ item: ItineraryItem; day: ItineraryDay } | null>(null);
   const [loading, setLoading] = useState(true);
   const [editable, setEditable] = useState(false);
+  const canEdit = editable && session.editing && !session.saving;
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   const dayBarRef = useRef<HTMLDivElement>(null);
@@ -136,18 +150,16 @@ const Schedule = () => {
   const [editTarget, setEditTarget] = useState<{ item: ItineraryItem; dayId: string } | null>(null);
   const [addDayId, setAddDayId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ItemDraft>(emptyDraft());
-  const [saving, setSaving] = useState(false);
 
   /* Day-level edit state */
   const [isAddingDay, setIsAddingDay] = useState(false);
   const [dayDraft, setDayDraft] = useState<DayDraft>({ date: "", day: "1" });
-  const [savingDay, setSavingDay] = useState(false);
 
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "itinerary")
       .then(({ data, editable }) => {
-        setDays(data);
+        load(data);
         setEditable(editable);
         const ti = data.findIndex((d) => d.date === today);
         if (ti >= 0) setDayIdx(ti);
@@ -162,7 +174,6 @@ const Schedule = () => {
     const btn = bar.children[dayIdx] as HTMLElement | undefined;
     btn?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
   }, [dayIdx, days.length]);
-
   const goToDay = (idx: number) => {
     setDirection(idx >= dayIdx ? 1 : -1);
     setDayIdx(idx);
@@ -226,69 +237,46 @@ const Schedule = () => {
     const newIdx = Math.min(dayIdx, next.length - 1);
     setDays(next);
     setDayIdx(Math.max(0, newIdx));
-    saveTripData(trip.id, "itinerary", next).catch(console.error);
   };
 
-  const handleSaveDay = async () => {
-    setSavingDay(true);
-    try {
-      const parsedDay = Number(dayDraft.day);
-      const newDay: ItineraryDay = {
-        id: `day-${Date.now()}`,
-        day: isNaN(parsedDay) ? dayDraft.day : parsedDay,
-        date: dayDraft.date,
-        items: [],
-      };
-      const next = [...days, newDay].sort((a, b) => a.date.localeCompare(b.date));
-      setDays(next);
-      setDayIdx(next.findIndex((d) => d.id === newDay.id));
-      await saveTripData(trip.id, "itinerary", next);
-      setIsAddingDay(false);
-    } catch (err) {
-      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
-    } finally {
-      setSavingDay(false);
-    }
+  const handleSaveDay = () => {
+    const parsedDay = Number(dayDraft.day);
+    const newDay: ItineraryDay = {
+      id: `day-${Date.now()}`,
+      day: isNaN(parsedDay) ? dayDraft.day : parsedDay,
+      date: dayDraft.date,
+      items: [],
+    };
+    const next = [...days, newDay].sort((a, b) => a.date.localeCompare(b.date));
+    setDays(next);
+    setDayIdx(next.findIndex((d) => d.id === newDay.id));
+    setIsAddingDay(false);
   };
 
   const handleDelete = (itemId: string, dayId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("確定要刪除這個行程項目？")) return;
-    const next = days.map((d) =>
+    setDays(days.map((d) =>
       d.id === dayId ? { ...d, items: d.items.filter((it) => it.id !== itemId) } : d
-    );
-    setDays(next);
-    saveTripData(trip.id, "itinerary", next).catch(console.error);
+    ));
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      let next: ItineraryDay[];
-      if (editTarget) {
-        next = days.map((d) =>
-          d.id === editTarget.dayId
-            ? { ...d, items: d.items.map((it) => it.id === editTarget.item.id ? draftToItem(draft, it.id) : it) }
-            : d
-        );
-      } else if (addDayId) {
-        const newId = `${addDayId}-${Date.now()}`;
-        next = days.map((d) =>
-          d.id === addDayId
-            ? { ...d, items: [...d.items, draftToItem(draft, newId)] }
-            : d
-        );
-      } else {
-        return;
-      }
-      setDays(next);
-      await saveTripData(trip.id, "itinerary", next);
-      closeModal();
-    } catch (err) {
-      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
-    } finally {
-      setSaving(false);
+  const handleSave = () => {
+    if (editTarget) {
+      setDays(days.map((d) =>
+        d.id === editTarget.dayId
+          ? { ...d, items: d.items.map((it) => it.id === editTarget.item.id ? draftToItem(draft, it.id) : it) }
+          : d
+      ));
+    } else if (addDayId) {
+      const newId = `${addDayId}-${Date.now()}`;
+      setDays(days.map((d) =>
+        d.id === addDayId
+          ? { ...d, items: [...d.items, draftToItem(draft, newId)] }
+          : d
+      ));
     }
+    closeModal();
   };
 
   if (error) return (
@@ -320,6 +308,17 @@ const Schedule = () => {
       onTouchEnd={handleTouchEnd}
     >
       {apiEnabled && !loading && !error && !editable && <ReadOnlyBanner />}
+
+      {editable && !loading && editSlot && createPortal(
+        <EditControls
+          editing={session.editing}
+          saving={session.saving}
+          onStart={session.start}
+          onCancel={session.cancel}
+          onFinish={session.finish}
+        />,
+        editSlot
+      )}
 
       {/* Day bar */}
       <div
@@ -358,7 +357,7 @@ const Schedule = () => {
           }
         </div>
         <div className="flex items-center gap-1.5 shrink-0 pr-3">
-          {editable && !loading && (
+          {canEdit && !loading && (
             <AddBtn onClick={openAddDay} label="新增日" />
           )}
           {!loading && todayIdx >= 0 && todayIdx !== dayIdx && (
@@ -396,7 +395,7 @@ const Schedule = () => {
           <span className="font-mono flex-1" style={{ fontSize: ".7rem", color: "var(--ink-soft)", letterSpacing: ".18em" }}>
             {weekday(currentDay.date)} · DAY {currentDay.day}
           </span>
-          {editable && (
+          {canEdit && (
             <DeleteBtn onClick={() => handleDeleteDay(currentDay.id)} />
           )}
         </div>
@@ -497,8 +496,8 @@ const Schedule = () => {
                       {cat.g}
                     </div>
 
-                    {/* Dev edit/delete buttons */}
-                    {editable && (
+                    {/* Edit/delete buttons */}
+                    {canEdit && (
                       <div
                         className="absolute flex gap-0.5"
                         style={{ top: 6, right: 6 }}
@@ -533,7 +532,7 @@ const Schedule = () => {
             })}
 
             {/* Add item button */}
-            {editable && currentDay && (
+            {canEdit && currentDay && (
               <div className="flex justify-center pt-2 pb-1">
                 <AddBtn onClick={() => openAdd(currentDay.id)} label="新增行程" />
               </div>
@@ -661,13 +660,12 @@ const Schedule = () => {
       </AnimatePresence>
 
       {/* Add day modal */}
-      {editable && (
+      {canEdit && (
         <EditModal
           title="新增日"
           open={isAddingDay}
           onClose={() => setIsAddingDay(false)}
           onSave={handleSaveDay}
-          saving={savingDay}
         >
           <FieldInput label="日期" value={dayDraft.date} onChange={(v) => setDayDraft((d) => ({ ...d, date: v }))} type="date" />
           <FieldInput label="第幾天（Day N）" value={dayDraft.day} onChange={(v) => setDayDraft((d) => ({ ...d, day: v }))} placeholder="1 或 8A" />
@@ -675,13 +673,12 @@ const Schedule = () => {
       )}
 
       {/* Edit / Add item modal */}
-      {editable && (
+      {canEdit && (
         <EditModal
           title={modalTitle}
           open={isEditing}
           onClose={closeModal}
           onSave={handleSave}
-          saving={saving}
         >
           <FieldInput label="標題" value={draft.title} onChange={(v) => setDraft((d) => ({ ...d, title: v }))} placeholder="行程名稱" />
           <FieldInput label="地點" value={draft.location} onChange={(v) => setDraft((d) => ({ ...d, location: v }))} placeholder="地點名稱" />

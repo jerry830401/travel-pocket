@@ -4,10 +4,34 @@ import type { Trip } from "../types";
 import { loadTrips } from "../dataSource";
 import { useTheme } from "../contexts/ThemeContext";
 
+/**
+ * What the tab pages get from `useOutletContext`. `editSlot` is the spot next
+ * to the theme button where each page portals its own EditControls, since only
+ * the page knows whether its data is editable. A page in edit mode calls
+ * `setNavLocked(true)`, which disables the back link and the tabs so its
+ * draft is not lost.
+ */
+export type TripOutletContext = {
+  trip: Trip;
+  editSlot: HTMLElement | null;
+  setNavLocked: (locked: boolean) => void;
+};
+
+/* Stops a link while a page is in edit mode. */
+function lockedLink(locked: boolean) {
+  return {
+    "aria-disabled": locked || undefined,
+    tabIndex: locked ? -1 : undefined,
+    onClick: (e: React.MouseEvent) => { if (locked) e.preventDefault(); },
+  };
+}
+
 const TripView = () => {
   const { tripId } = useParams();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [error, setError] = useState(false);
+  const [editSlot, setEditSlot] = useState<HTMLElement | null>(null);
+  const [navLocked, setNavLocked] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -78,12 +102,15 @@ const TripView = () => {
       >
         <Link
           to="/"
+          {...lockedLink(navLocked)}
           className="shrink-0 flex items-center justify-center font-hand transition-all duration-150"
           style={{
             width: 34, height: 34, borderRadius: "50%",
             border: "1.5px solid var(--ink)",
             background: "transparent", color: "var(--ink)", fontSize: 22,
             textDecoration: "none",
+            opacity: navLocked ? .35 : 1,
+            cursor: navLocked ? "not-allowed" : undefined,
           }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateX(-2px)"; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "translateX(0)"; }}
@@ -101,6 +128,8 @@ const TripView = () => {
             {trip.startDate} → {trip.endDate}
           </div>
         </div>
+        {/* `contents`: no box of its own, so an empty slot adds no gap */}
+        <div ref={setEditSlot} className="contents" />
         <button
           onClick={toggleTheme}
           aria-label="切換主題"
@@ -117,13 +146,16 @@ const TripView = () => {
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto scrollbar-hide overscroll-y-contain">
-        <Outlet context={{ trip }} />
+        <Outlet context={{ trip, editSlot, setNavLocked } satisfies TripOutletContext} />
       </main>
 
       {/* Bottom nav */}
       <nav
         className="shrink-0 flex justify-around px-2 pb-3 pt-2.5 z-30"
-        style={{ background: "var(--paper)", borderTop: "1.5px dashed var(--rule)" }}
+        style={{
+          background: "var(--paper)", borderTop: "1.5px dashed var(--rule)",
+          opacity: navLocked ? .35 : 1,
+        }}
       >
         {tabs.map((t) => {
           const isActive = activeTab === t.key;
@@ -131,6 +163,7 @@ const TripView = () => {
             <Link
               key={t.key}
               to={`/trip/${tripId}/${t.key}`}
+              {...lockedLink(navLocked)}
               className="font-hand font-bold transition-all duration-150"
               style={{
                 background: isActive ? "var(--ink)" : "transparent",
@@ -142,6 +175,7 @@ const TripView = () => {
                 boxShadow: isActive ? "2px 2px 0 var(--rule)" : "none",
                 textDecoration: "none",
                 border: "none",
+                cursor: navLocked ? "not-allowed" : undefined,
               }}
             >
               {t.label}

@@ -11,7 +11,8 @@ import {
   saveTrips,
   signOut,
 } from "../dataSource";
-import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, ReadOnlyBanner } from "../components/editor";
+import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
+import { useEditSession, type SaveDraft } from "../components/editor/useEditSession";
 
 function seasonTag(startDate: string) {
   const m = parseInt(startDate.split("-")[1], 10);
@@ -62,26 +63,54 @@ function draftToNewTrip(draft: TripDraft): NewTrip {
   return trip;
 }
 
+/* A trip added in edit mode has a placeholder id until 完成 creates it; ':'
+   never appears in a real id (ID_PATTERN). */
+const NEW_ID = "new:";
+
+/**
+ * Saves the trip list in the order the API needs: deletions first, then new
+ * trips (the server assigns their ids), then one PUT for edits and order.
+ * Each step is reported, so a retry after a failure skips what went through.
+ */
+const saveTripList: SaveDraft<Trip[]> = async (draft, saved, progress) => {
+  let s = saved;
+  let d = draft;
+  for (const trip of s.filter((t) => !d.some((x) => x.id === t.id))) {
+    await deleteTrip(trip.id);
+    s = s.filter((t) => t.id !== trip.id);
+    progress(s, d);
+  }
+  for (const trip of d.filter((t) => t.id.startsWith(NEW_ID))) {
+    const created = await createTrip(draftToNewTrip(tripToDraft(trip)));
+    s = [...s, created];
+    d = d.map((t) => (t.id === trip.id ? created : t));
+    progress(s, d);
+  }
+  if (JSON.stringify(s) !== JSON.stringify(d)) await saveTrips(d);
+  return d;
+};
+
 const Home = () => {
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const session = useEditSession<Trip[]>([], saveTripList);
+  const { data: trips, setData: setTrips, load, editing } = session;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
   const { theme, toggleTheme } = useTheme();
   const [editable, setEditable] = useState(false);
+  const canEdit = editable && editing && !session.saving;
   const [me, setMe] = useState<Me | null>(null);
 
   /* Edit state */
   const [editTarget, setEditTarget] = useState<Trip | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<TripDraft>(EMPTY_DRAFT);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadTrips()
-      .then(({ data, editable }) => { setTrips(data); setEditable(editable); setLoading(false); })
+      .then(({ data, editable }) => { load(data); setEditable(editable); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
-  }, [retry]);
+  }, [retry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadMe().then(setMe);
@@ -104,43 +133,27 @@ const Home = () => {
     setAdding(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!draft.name.trim() || !draft.startDate || !draft.endDate) {
       alert("請填寫旅行名稱與日期");
       return;
     }
-    setSaving(true);
-    try {
-      if (adding) {
-        const created = await createTrip(draftToNewTrip(draft));
-        setTrips((prev) => [...prev, created]);
-      } else if (editTarget) {
-        const next = trips.map((t) =>
-          t.id === editTarget.id ? { ...draftToNewTrip(draft), id: t.id } : t
-        );
-        setTrips(next);
-        await saveTrips(next);
-      }
-      closeModal();
-    } catch (err) {
-      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
-    } finally {
-      setSaving(false);
+    if (adding) {
+      setTrips([...trips, { ...draftToNewTrip(draft), id: `${NEW_ID}${Date.now()}` }]);
+    } else if (editTarget) {
+      setTrips(trips.map((t) =>
+        t.id === editTarget.id ? { ...draftToNewTrip(draft), id: t.id } : t
+      ));
     }
+    closeModal();
   };
 
-  // Removes the trip only once the API has deleted it (with its itinerary,
-  // shops and info), so a failure leaves the list as it was.
-  const handleDelete = async (trip: Trip, e: React.MouseEvent) => {
+  // The API deletes the trip (with its itinerary, shops and info) on 完成.
+  const handleDelete = (trip: Trip, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!confirm(`確定要刪除「${trip.name}」？行程、店家和資訊會一起刪除。`)) return;
-    try {
-      await deleteTrip(trip.id);
-      setTrips((prev) => prev.filter((t) => t.id !== trip.id));
-    } catch (err) {
-      alert(`刪除失敗：${err instanceof Error ? err.message : err}`);
-    }
+    setTrips(trips.filter((t) => t.id !== trip.id));
   };
 
   return (
@@ -183,10 +196,13 @@ const Home = () => {
                 {!import.meta.env.DEV && (
                   <button
                     onClick={() => void signOut()}
+                    disabled={editing}
                     className="font-hand font-bold"
                     style={{
                       border: "none", background: "transparent", padding: 0,
-                      color: "var(--red)", fontSize: ".95rem", cursor: "pointer",
+                      color: "var(--red)", fontSize: ".95rem",
+                      cursor: editing ? "not-allowed" : "pointer",
+                      opacity: editing ? .35 : 1,
                     }}
                   >
                     登出
@@ -195,18 +211,29 @@ const Home = () => {
               </p>
             )}
           </div>
-          <button
-            onClick={toggleTheme}
-            aria-label="切換主題"
-            className="shrink-0 flex items-center justify-center font-hand transition-all duration-150 hover:rotate-[-10deg]"
-            style={{
-              width: 36, height: 36, borderRadius: "50%",
-              border: "1.5px dashed var(--ink)",
-              background: "transparent", color: "var(--ink)", fontSize: 18,
-            }}
-          >
-            {theme === "dark" ? "☀" : "☾"}
-          </button>
+          <div className="shrink-0 flex items-center gap-2">
+            {editable && !loading && !error && (
+              <EditControls
+                editing={editing}
+                saving={session.saving}
+                onStart={session.start}
+                onCancel={session.cancel}
+                onFinish={session.finish}
+              />
+            )}
+            <button
+              onClick={toggleTheme}
+              aria-label="切換主題"
+              className="shrink-0 flex items-center justify-center font-hand transition-all duration-150 hover:rotate-[-10deg]"
+              style={{
+                width: 36, height: 36, borderRadius: "50%",
+                border: "1.5px dashed var(--ink)",
+                background: "transparent", color: "var(--ink)", fontSize: 18,
+              }}
+            >
+              {theme === "dark" ? "☀" : "☾"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -284,7 +311,10 @@ const Home = () => {
             <Link
               to={`/trip/${trip.id}`}
               key={trip.id}
-              className="block mb-8 cursor-pointer"
+              // Opening a trip would drop the draft, so edit mode stays here.
+              aria-disabled={editing || undefined}
+              onClick={(e) => { if (editing) e.preventDefault(); }}
+              className={`block mb-8 ${editing ? "cursor-default" : "cursor-pointer"}`}
               style={{ transform: baseRotate, transition: "transform .25s cubic-bezier(.2,.8,.3,1), box-shadow .2s", display: "block" }}
               onMouseEnter={e => {
                 const el = e.currentTarget as HTMLElement;
@@ -315,7 +345,7 @@ const Home = () => {
                 }} />
 
                 {/* Edit / delete buttons, left of the → circle */}
-                {editable && (
+                {canEdit && (
                   <div
                     className="absolute z-10 flex gap-0.5"
                     style={{ bottom: 24, right: 58 }}
@@ -377,7 +407,7 @@ const Home = () => {
           );
         })}
 
-        {editable && !loading && !error && (
+        {canEdit && !loading && !error && (
           <div className="flex justify-center">
             <AddBtn onClick={openAdd} label="新增旅程" />
           </div>
@@ -385,13 +415,12 @@ const Home = () => {
       </div>
 
       {/* Add / edit modal */}
-      {editable && (
+      {canEdit && (
         <EditModal
           title={adding ? "新增旅行" : "編輯旅行"}
           open={adding || Boolean(editTarget)}
           onClose={closeModal}
           onSave={handleSave}
-          saving={saving}
         >
           <FieldInput label="旅行名稱" value={draft.name} onChange={(v) => setDraft((d) => ({ ...d, name: v }))} placeholder="福岡・熊本" />
           <div className="grid grid-cols-2 gap-3">

@@ -1,8 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useOutletContext } from "react-router-dom";
-import type { Trip, Shop } from "../types";
+import type { Shop } from "../types";
+import type { TripOutletContext } from "./TripView";
 import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
-import { EditModal, FieldInput, FieldTags, EditBtn, DeleteBtn, AddBtn, ReadOnlyBanner } from "../components/editor";
+import { EditModal, FieldInput, FieldTags, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
+import { useEditSession } from "../components/editor/useEditSession";
 
 const PIN_SVG = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -42,11 +45,20 @@ function draftToShop(draft: ShopDraft, id: string): Shop {
 }
 
 const Shops = () => {
-  const { trip } = useOutletContext<{ trip: Trip }>();
-  const [shops, setShops] = useState<Shop[]>([]);
+  const { trip, editSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const session = useEditSession<Shop[]>(
+    [],
+    async (next) => {
+      await saveTripData(trip.id, "shops", next);
+      return next;
+    },
+    setNavLocked
+  );
+  const { data: shops, setData: setShops, load } = session;
   const [selectedTag, setSelectedTag] = useState("All");
   const [loading, setLoading] = useState(true);
   const [editable, setEditable] = useState(false);
+  const canEdit = editable && session.editing && !session.saving;
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
 
@@ -54,14 +66,13 @@ const Shops = () => {
   const [editTarget, setEditTarget] = useState<Shop | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [draft, setDraft] = useState<ShopDraft>(emptyDraft());
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "shops")
-      .then(({ data, editable }) => { setShops(data); setEditable(editable); setLoading(false); })
+      .then(({ data, editable }) => { load(data); setEditable(editable); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
-  }, [trip, retry]);
+  }, [trip, retry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tags = useMemo(() => {
     const all = new Set(shops.flatMap((s) => s.tags));
@@ -93,29 +104,16 @@ const Shops = () => {
   const handleDelete = (shopId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("確定要刪除這間店家？")) return;
-    const next = shops.filter((s) => s.id !== shopId);
-    setShops(next);
-    saveTripData(trip.id, "shops", next).catch(console.error);
+    setShops(shops.filter((s) => s.id !== shopId));
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      let next: Shop[];
-      if (editTarget) {
-        next = shops.map((s) => s.id === editTarget.id ? draftToShop(draft, s.id) : s);
-      } else {
-        const newId = `shop-${Date.now()}`;
-        next = [...shops, draftToShop(draft, newId)];
-      }
-      setShops(next);
-      await saveTripData(trip.id, "shops", next);
-      closeModal();
-    } catch (err) {
-      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
-    } finally {
-      setSaving(false);
+  const handleSave = () => {
+    if (editTarget) {
+      setShops(shops.map((s) => s.id === editTarget.id ? draftToShop(draft, s.id) : s));
+    } else {
+      setShops([...shops, draftToShop(draft, `shop-${Date.now()}`)]);
     }
+    closeModal();
   };
 
   const isEditing = Boolean(editTarget) || isAdding;
@@ -124,6 +122,17 @@ const Shops = () => {
   return (
     <div style={{ background: "var(--bg)" }}>
       {apiEnabled && !loading && !error && !editable && <ReadOnlyBanner />}
+
+      {editable && !loading && !error && editSlot && createPortal(
+        <EditControls
+          editing={session.editing}
+          saving={session.saving}
+          onStart={session.start}
+          onCancel={session.cancel}
+          onFinish={session.finish}
+        />,
+        editSlot
+      )}
 
       {/* Tag bar */}
       <div
@@ -231,7 +240,7 @@ const Shops = () => {
                   {shop.name}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {editable && (
+                  {canEdit && (
                     <>
                       <EditBtn onClick={(e) => openEdit(shop, e)} />
                       <DeleteBtn onClick={(e) => handleDelete(shop.id, e)} />
@@ -286,7 +295,7 @@ const Shops = () => {
         })}
 
         {/* Add button */}
-        {editable && !loading && !error && (
+        {canEdit && !loading && !error && (
           <div className="flex justify-center pt-2">
             <AddBtn onClick={openAdd} label="新增店家" />
           </div>
@@ -294,13 +303,12 @@ const Shops = () => {
       </div>
 
       {/* Edit / Add modal */}
-      {editable && (
+      {canEdit && (
         <EditModal
           title={modalTitle}
           open={isEditing}
           onClose={closeModal}
           onSave={handleSave}
-          saving={saving}
         >
           <FieldInput label="店名" value={draft.name} onChange={(v) => setDraft((d) => ({ ...d, name: v }))} placeholder="店家名稱" />
           <FieldInput label="地點" value={draft.location} onChange={(v) => setDraft((d) => ({ ...d, location: v }))} placeholder="地點描述" />

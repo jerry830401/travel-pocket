@@ -10,6 +10,7 @@ import {
   EditBtn,
   DeleteBtn,
   AddBtn,
+  EditControls,
   ReadOnlyBanner,
 } from "./index";
 
@@ -64,7 +65,7 @@ describe("EditModal", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("點擊儲存按鈕觸發 onSave", async () => {
+  it("點擊確定按鈕觸發 onSave", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     render(
@@ -72,18 +73,8 @@ describe("EditModal", () => {
         <div />
       </EditModal>
     );
-    await user.click(screen.getByRole("button", { name: "儲存" }));
+    await user.click(screen.getByRole("button", { name: "確定" }));
     expect(onSave).toHaveBeenCalledOnce();
-  });
-
-  it("saving=true 時儲存按鈕顯示儲存中並 disabled", () => {
-    render(
-      <EditModal title="T" open={true} onClose={vi.fn()} onSave={vi.fn()} saving={true}>
-        <div />
-      </EditModal>
-    );
-    const btn = screen.getByRole("button", { name: "儲存中…" });
-    expect(btn).toBeDisabled();
   });
 
   it("點擊關閉按鈕（×）觸發 onClose", async () => {
@@ -237,6 +228,37 @@ describe("AddBtn", () => {
     render(<AddBtn onClick={onClick} />);
     await user.click(screen.getByRole("button", { name: /新增/ }));
     expect(onClick).toHaveBeenCalledOnce();
+  });
+});
+
+/* ── EditControls ──────────────────────────────────────────────── */
+
+describe("EditControls", () => {
+  const handlers = () => ({ onStart: vi.fn(), onCancel: vi.fn(), onFinish: vi.fn() });
+
+  it("檢視時只有「編輯」，點擊觸發 onStart", async () => {
+    const user = userEvent.setup();
+    const h = handlers();
+    render(<EditControls editing={false} saving={false} {...h} />);
+    expect(screen.queryByRole("button", { name: "取消" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "編輯" }));
+    expect(h.onStart).toHaveBeenCalledOnce();
+  });
+
+  it("編輯時有「取消」與「完成」", async () => {
+    const user = userEvent.setup();
+    const h = handlers();
+    render(<EditControls editing={true} saving={false} {...h} />);
+    await user.click(screen.getByRole("button", { name: "取消" }));
+    await user.click(screen.getByRole("button", { name: "完成" }));
+    expect(h.onCancel).toHaveBeenCalledOnce();
+    expect(h.onFinish).toHaveBeenCalledOnce();
+  });
+
+  it("儲存中顯示「儲存中…」並停用兩個按鈕", () => {
+    render(<EditControls editing={true} saving={true} {...handlers()} />);
+    expect(screen.getByRole("button", { name: "儲存中…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
   });
 });
 

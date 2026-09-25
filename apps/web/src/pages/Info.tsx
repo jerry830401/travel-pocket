@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useOutletContext } from "react-router-dom";
-import type { Trip, InfoItem, InfoLink } from "../types";
+import type { InfoItem, InfoLink } from "../types";
+import type { TripOutletContext } from "./TripView";
 import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
-import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, ReadOnlyBanner } from "../components/editor";
+import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
+import { useEditSession } from "../components/editor/useEditSession";
 
 const EXT = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -22,29 +25,31 @@ type ItemDraft = { title: string; icon: string };
 type LinkDraft = { label: string; url: string };
 
 const Info = () => {
-  const { trip } = useOutletContext<{ trip: Trip }>();
-  const [items, setItems] = useState<InfoItem[]>([]);
+  const { trip, editSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const session = useEditSession<InfoItem[]>(
+    [],
+    async (next) => {
+      await saveTripData(trip.id, "info", next);
+      return next;
+    },
+    setNavLocked
+  );
+  const { data: items, setData: setItems, load } = session;
   const [loading, setLoading] = useState(true);
   const [editable, setEditable] = useState(false);
+  const canEdit = editable && session.editing && !session.saving;
 
   /* Edit state */
   const [editState, setEditState] = useState<EditState>(null);
   const [itemDraft, setItemDraft] = useState<ItemDraft>({ title: "", icon: "" });
   const [linkDraft, setLinkDraft] = useState<LinkDraft>({ label: "", url: "" });
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "info")
-      .then(({ data, editable }) => { setItems(data); setEditable(editable); setLoading(false); })
+      .then(({ data, editable }) => { load(data); setEditable(editable); setLoading(false); })
       .catch(console.error);
-  }, [trip]);
-
-  /* Persist helper */
-  const persist = (next: InfoItem[]) => {
-    setItems(next);
-    return saveTripData(trip.id, "info", next);
-  };
+  }, [trip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── InfoItem actions ── */
   const openEditItem = (item: InfoItem, e: React.MouseEvent) => {
@@ -61,7 +66,7 @@ const Info = () => {
   const handleDeleteItem = (itemId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("確定要刪除這個資訊類別？")) return;
-    persist(items.filter((it) => it.id !== itemId)).catch(console.error);
+    setItems(items.filter((it) => it.id !== itemId));
   };
 
   /* ── InfoLink actions ── */
@@ -81,49 +86,41 @@ const Info = () => {
     e.preventDefault();
     e.stopPropagation();
     if (!confirm("確定要刪除這個連結？")) return;
-    const next = items.map((it) =>
+    setItems(items.map((it) =>
       it.id === itemId
         ? { ...it, links: it.links.filter((_, i) => i !== linkIdx) }
         : it
-    );
-    persist(next).catch(console.error);
+    ));
   };
 
-  /* ── Save ── */
-  const handleSave = async () => {
+  /* ── Apply the modal to the draft ── */
+  const handleSave = () => {
     if (!editState) return;
-    setSaving(true);
-    try {
-      let next: InfoItem[];
+    let next: InfoItem[];
 
-      if (editState.type === "editItem") {
-        next = items.map((it) =>
-          it.id === editState.item.id ? { ...it, ...itemDraft } : it
-        );
-      } else if (editState.type === "addItem") {
-        next = [...items, { id: `info-${Date.now()}`, ...itemDraft, links: [] }];
-      } else if (editState.type === "editLink") {
-        next = items.map((it) =>
-          it.id === editState.itemId
-            ? { ...it, links: it.links.map((l, i) => (i === editState.linkIdx ? { ...linkDraft } : l)) }
-            : it
-        );
-      } else {
-        // addLink
-        next = items.map((it) =>
-          it.id === editState.itemId
-            ? { ...it, links: [...it.links, { ...linkDraft }] }
-            : it
-        );
-      }
-
-      await persist(next);
-      setEditState(null);
-    } catch (err) {
-      alert(`儲存失敗：${err instanceof Error ? err.message : err}`);
-    } finally {
-      setSaving(false);
+    if (editState.type === "editItem") {
+      next = items.map((it) =>
+        it.id === editState.item.id ? { ...it, ...itemDraft } : it
+      );
+    } else if (editState.type === "addItem") {
+      next = [...items, { id: `info-${Date.now()}`, ...itemDraft, links: [] }];
+    } else if (editState.type === "editLink") {
+      next = items.map((it) =>
+        it.id === editState.itemId
+          ? { ...it, links: it.links.map((l, i) => (i === editState.linkIdx ? { ...linkDraft } : l)) }
+          : it
+      );
+    } else {
+      // addLink
+      next = items.map((it) =>
+        it.id === editState.itemId
+          ? { ...it, links: [...it.links, { ...linkDraft }] }
+          : it
+      );
     }
+
+    setItems(next);
+    setEditState(null);
   };
 
   const isItemModal = editState?.type === "editItem" || editState?.type === "addItem";
@@ -141,11 +138,22 @@ const Info = () => {
     <div style={{ padding: "18px 18px 84px", background: "var(--bg)" }}>
       {apiEnabled && !loading && !editable && <ReadOnlyBanner />}
 
+      {editable && !loading && editSlot && createPortal(
+        <EditControls
+          editing={session.editing}
+          saving={session.saving}
+          onStart={session.start}
+          onCancel={session.cancel}
+          onFinish={session.finish}
+        />,
+        editSlot
+      )}
+
       <div className="flex items-center justify-between mb-3.5">
         <div className="font-hand font-bold" style={{ fontSize: "1.6rem", color: "var(--ink)" }}>
           小筆記
         </div>
-        {editable && <AddBtn onClick={openAddItem} label="新增類別" />}
+        {canEdit && <AddBtn onClick={openAddItem} label="新增類別" />}
       </div>
 
       {loading && (
@@ -187,7 +195,7 @@ const Info = () => {
             <div className="font-hand font-bold flex-1" style={{ fontSize: "1.4rem", lineHeight: 1, color: "var(--ink)" }}>
               {item.title}
             </div>
-            {editable && (
+            {canEdit && (
               <div className="flex gap-0.5">
                 <EditBtn onClick={(e) => openEditItem(item, e)} />
                 <DeleteBtn onClick={(e) => handleDeleteItem(item.id, e)} />
@@ -227,7 +235,7 @@ const Info = () => {
                 <span className="truncate">{link.label}</span>
                 <span style={{ color: "var(--ink-faint)", flexShrink: 0, marginLeft: 8 }}>{EXT}</span>
               </a>
-              {editable && (
+              {canEdit && (
                 <div className="flex gap-0.5 px-2 shrink-0">
                   <EditBtn onClick={(e) => openEditLink(item.id, idx, link, e)} />
                   <DeleteBtn onClick={(e) => handleDeleteLink(item.id, idx, e)} />
@@ -237,7 +245,7 @@ const Info = () => {
           ))}
 
           {/* Add link button */}
-          {editable && (
+          {canEdit && (
             <div
               className="flex justify-center py-2"
               style={{ borderTop: item.links.length > 0 ? "1px dashed var(--rule)" : "none" }}
@@ -249,14 +257,13 @@ const Info = () => {
       ))}
 
       {/* InfoItem modal */}
-      {editable && (
+      {canEdit && (
         <>
           <EditModal
             title={modalTitle}
             open={isItemModal}
             onClose={() => setEditState(null)}
             onSave={handleSave}
-            saving={saving}
           >
             <FieldInput label="標題" value={itemDraft.title} onChange={(v) => setItemDraft((d) => ({ ...d, title: v }))} placeholder="資訊類別名稱" />
             <FieldInput label="圖示（emoji）" value={itemDraft.icon} onChange={(v) => setItemDraft((d) => ({ ...d, icon: v }))} placeholder="🛂" />
@@ -267,7 +274,6 @@ const Info = () => {
             open={isLinkModal}
             onClose={() => setEditState(null)}
             onSave={handleSave}
-            saving={saving}
           >
             <FieldInput label="連結名稱" value={linkDraft.label} onChange={(v) => setLinkDraft((d) => ({ ...d, label: v }))} placeholder="網站名稱" />
             <FieldInput label="URL" value={linkDraft.url} onChange={(v) => setLinkDraft((d) => ({ ...d, url: v }))} placeholder="https://..." type="url" />
