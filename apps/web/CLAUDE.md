@@ -102,7 +102,7 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 
 ## Build & Deploy
 
-- Deployed to Cloudflare Workers as the `travel-pocket` Worker (`wrangler.jsonc`), at `https://travel-pocket.<subdomain>.workers.dev`, which Cloudflare Access protects. Static assets come from `dist/`. `assets.run_worker_first: ["/api/*"]` sends only API calls to `worker/index.ts`, which forwards them unchanged, Access headers included, to the API Worker (`travel-pocket-api`) through the `API` service binding, and answers 503 when that Worker is unreachable. The app and its API therefore share one origin.
+- Deployed to Cloudflare Workers as the `travel-pocket` Worker (`wrangler.jsonc`), at `https://travel-pocket.travel-pocket-web.workers.dev`, which Cloudflare Access protects. Static assets come from `dist/`. `assets.run_worker_first: ["/api/*"]` sends only API calls to `worker/index.ts`, which forwards them unchanged, Access headers included, to the API Worker (`travel-pocket-api`) through the `API` service binding, and answers 503 when that Worker is unreachable. The app and its API therefore share one origin.
 - `worker/` is typed with its own `tsconfig.worker.json` and the generated `worker/worker-configuration.d.ts` (`cf-typegen`); rerun it after changing `wrangler.jsonc`. `worker/index.test.ts` runs with the unit tests.
 - `.env.production` sets `VITE_API_URL=/api` for every `vite build`.
 - Base path is `/` (`vite.config.ts`, the PWA manifest, `index.html`).
