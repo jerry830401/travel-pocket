@@ -40,6 +40,8 @@ pnpm test:e2e
    type 使用：`feat` / `fix` / `refactor` / `test` / `ci` / `docs` / `chore`
 
    `<模型名稱>` 填當下實際執行的模型（例如 `Opus 5.5`），不要沿用舊 commit 或寫死的型號。
+
+   若本次改動對應 issue，在詳細說明與 `Co-Authored-By` 之間加上 `Refs #N`。
 4. 執行 `git commit -m "..."`。
 
 ## 中止時的訊息範本
