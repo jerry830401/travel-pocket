@@ -89,10 +89,9 @@ pnpm workspace monorepo。`apps/*` 是各自獨立開發、測試、部署的應
 │       ├── migrations/    # D1 schema
 │       ├── scripts/seed.ts
 │       └── wrangler.jsonc
-├── packages/
-│   ├── shared/            # 共用型別與 API 契約（@travel-pocket/shared）
-│   └── data/              # 範例行程 JSON（@travel-pocket/data）
-└── docs/                  # 需求文件與套件說明
+└── packages/
+    ├── shared/            # 共用型別與 API 契約（@travel-pocket/shared）
+    └── data/              # 範例行程 JSON（@travel-pocket/data）
 ```
 
 ## 路由
