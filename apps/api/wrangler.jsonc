@@ -11,12 +11,19 @@
     }
   ],
   "secrets": {
-    // Local dev reads it from .dev.vars; production uses `wrangler secret put`.
-    "required": ["ADMIN_TOKEN"]
+    // No secrets. Declaring the (empty) list keeps `wrangler types` and
+    // `wrangler dev` from picking up whatever a local .dev.vars contains.
+    "required": []
   },
   "vars": {
     // Comma-separated list of origins allowed to call the API from a browser.
-    "CORS_ORIGINS": "http://localhost:5173,http://localhost:4173"
+    "CORS_ORIGINS": "http://localhost:5173,http://localhost:4173",
+    // Cloudflare Access (#5): the team domain (<team>.cloudflareaccess.com) and
+    // the Application Audience (AUD) tag. While either is empty, no request
+    // can authenticate with a JWT; local dev signs in as DEV_USER_EMAIL, which
+    // the dev scripts pass with --var.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
   },
   "dev": {
     "port": 8787

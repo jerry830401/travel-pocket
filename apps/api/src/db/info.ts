@@ -23,20 +23,3 @@ export async function getInfo(db: D1Database, tripId: string): Promise<InfoItem[
     .all<InfoItemRow>();
   return results.map(toInfoItem);
 }
-
-export async function replaceInfo(
-  db: D1Database,
-  tripId: string,
-  items: readonly InfoItem[]
-): Promise<void> {
-  await db.batch([
-    db.prepare("DELETE FROM info_items WHERE trip_id = ?1").bind(tripId),
-    db
-      .prepare(
-        `INSERT INTO info_items (trip_id, id, title, icon, links, position)
-         SELECT ?1, value ->> 'id', value ->> 'title', value ->> 'icon', value -> 'links', key
-         FROM json_each(?2)`
-      )
-      .bind(tripId, JSON.stringify(items)),
-  ]);
-}

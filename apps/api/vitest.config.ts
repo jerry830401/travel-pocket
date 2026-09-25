@@ -10,9 +10,15 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          // Test-only bindings: migrations for test/apply-migrations.ts, and a
-          // fixed token so tests don't depend on a local .dev.vars.
-          bindings: { TEST_MIGRATIONS: migrations, ADMIN_TOKEN: "test-token" },
+          // Test-only bindings: migrations for test/apply-migrations.ts, a fixed
+          // Access setup (tests sign their own JWTs for this team and AUD), and
+          // the dev identity the `dev` scripts pass with --var.
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            ACCESS_TEAM_DOMAIN: "travel-pocket-test.cloudflareaccess.com",
+            ACCESS_AUD: "test-aud",
+            DEV_USER_EMAIL: "dev@example.com",
+          },
         },
       }),
     ],

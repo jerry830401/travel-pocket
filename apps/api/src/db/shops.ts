@@ -30,22 +30,3 @@ export async function getShops(db: D1Database, tripId: string): Promise<Shop[]> 
     .all<ShopRow>();
   return results.map(toShop);
 }
-
-export async function replaceShops(
-  db: D1Database,
-  tripId: string,
-  shops: readonly Shop[]
-): Promise<void> {
-  await db.batch([
-    db.prepare("DELETE FROM shops WHERE trip_id = ?1").bind(tripId),
-    db
-      .prepare(
-        `INSERT INTO shops (trip_id, id, name, location, tags, business_hours,
-                            google_map_link, position)
-         SELECT ?1, value ->> 'id', value ->> 'name', value ->> 'location', value -> 'tags',
-                value ->> 'businessHours', value ->> 'googleMapLink', key
-         FROM json_each(?2)`
-      )
-      .bind(tripId, JSON.stringify(shops)),
-  ]);
-}

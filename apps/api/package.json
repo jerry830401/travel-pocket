@@ -4,13 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "dev:fullstack": "wrangler dev",
+    "dev": "wrangler dev --var DEV_USER_EMAIL:dev@example.com",
+    "dev:fullstack": "wrangler dev --var DEV_USER_EMAIL:dev@example.com",
     "deploy": "wrangler deploy",
     "build": "tsc -b",
     "test": "vitest run",
     "lint": "eslint .",
-    "cf-typegen": "wrangler types",
+    "cf-typegen": "wrangler types --strict-vars=false",
     "db:migrate:local": "wrangler d1 migrations apply travel-pocket --local",
     "db:migrate:remote": "wrangler d1 migrations apply travel-pocket --remote",
     "db:seed": "tsx scripts/seed.ts"

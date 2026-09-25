@@ -1,4 +1,6 @@
-import type { Trip } from "@travel-pocket/shared";
+import type { NewTrip, Trip } from "@travel-pocket/shared";
+import { run } from "./run";
+import { insertTripStatement, upsertTripsStatement } from "./writes";
 
 export interface TripRow {
   id: string;
@@ -21,38 +23,63 @@ export function toTrip(row: TripRow): Trip {
   return trip;
 }
 
-export async function listTrips(db: D1Database): Promise<Trip[]> {
+export async function listTrips(db: D1Database, ownerId: string): Promise<Trip[]> {
   const { results } = await db
     .prepare(
-      "SELECT id, name, start_date, end_date, cover_image, snapshot FROM trips ORDER BY position"
+      `SELECT id, name, start_date, end_date, cover_image, snapshot
+       FROM trips WHERE owner_id = ? ORDER BY position`
     )
+    .bind(ownerId)
     .all<TripRow>();
   return results.map(toTrip);
 }
 
-export async function tripExists(db: D1Database, tripId: string): Promise<boolean> {
-  const row = await db.prepare("SELECT 1 FROM trips WHERE id = ?").bind(tripId).first();
+export async function tripOwnedBy(db: D1Database, tripId: string, ownerId: string): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT 1 FROM trips WHERE id = ? AND owner_id = ?")
+    .bind(tripId, ownerId)
+    .first();
   return row !== null;
 }
 
-// Upsert only, never delete: removing a trip row cascades to its itinerary,
-// shops and info. The array index becomes the position.
-// `WHERE true` resolves SQLite's parsing ambiguity between SELECT and ON CONFLICT.
-export async function upsertTrips(db: D1Database, trips: readonly Trip[]): Promise<void> {
-  await db
+/** The ids in `tripIds` that already belong to another user. */
+export async function tripIdsOwnedByOthers(
+  db: D1Database,
+  tripIds: readonly string[],
+  ownerId: string
+): Promise<string[]> {
+  const { results } = await db
     .prepare(
-      `INSERT INTO trips (id, name, start_date, end_date, cover_image, snapshot, position)
-       SELECT value ->> 'id', value ->> 'name', value ->> 'startDate', value ->> 'endDate',
-              value ->> 'coverImage', value ->> 'snapshot', key
-       FROM json_each(?1) WHERE true
-       ON CONFLICT (id) DO UPDATE SET
-         name = excluded.name,
-         start_date = excluded.start_date,
-         end_date = excluded.end_date,
-         cover_image = excluded.cover_image,
-         snapshot = excluded.snapshot,
-         position = excluded.position`
+      "SELECT id FROM trips WHERE id IN (SELECT value FROM json_each(?1)) AND owner_id != ?2"
     )
-    .bind(JSON.stringify(trips))
-    .run();
+    .bind(JSON.stringify(tripIds), ownerId)
+    .all<{ id: string }>();
+  return results.map((row) => row.id);
+}
+
+export async function upsertTrips(
+  db: D1Database,
+  ownerId: string,
+  trips: readonly Trip[]
+): Promise<void> {
+  await run(db, upsertTripsStatement(ownerId, trips));
+}
+
+function newTripId(): string {
+  return crypto.randomUUID().replaceAll("-", "").slice(0, 12);
+}
+
+/** Adds a trip after the owner's last one, under a server-assigned id. */
+export async function createTrip(db: D1Database, ownerId: string, fields: NewTrip): Promise<Trip> {
+  // Ids are global; retry on the (astronomically rare) collision.
+  for (let attempt = 0; ; attempt++) {
+    const trip: Trip = { ...fields, id: newTripId() };
+    try {
+      await run(db, insertTripStatement(ownerId, trip));
+      return trip;
+    } catch (err) {
+      const collision = err instanceof Error && err.message.includes("trips.id");
+      if (!collision || attempt >= 2) throw err;
+    }
+  }
 }

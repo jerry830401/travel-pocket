@@ -63,36 +63,3 @@ export async function getItinerary(db: D1Database, tripId: string): Promise<Itin
   }
   return days.results.map((row) => toItineraryDay(row, itemsByDay.get(row.id) ?? []));
 }
-
-// One batch = one transaction. Deleting the days cascades to their items.
-// Each INSERT reads the whole array through json_each, so the statement count
-// stays fixed however long the trip is.
-export async function replaceItinerary(
-  db: D1Database,
-  tripId: string,
-  days: readonly ItineraryDay[]
-): Promise<void> {
-  const json = JSON.stringify(days);
-  await db.batch([
-    db.prepare("DELETE FROM itinerary_days WHERE trip_id = ?1").bind(tripId),
-    db
-      .prepare(
-        `INSERT INTO itinerary_days (trip_id, id, day, date, position)
-         SELECT ?1, d.value ->> 'id', CAST(d.value ->> 'day' AS TEXT), d.value ->> 'date', d.key
-         FROM json_each(?2) AS d`
-      )
-      .bind(tripId, json),
-    db
-      .prepare(
-        `INSERT INTO itinerary_items (trip_id, day_id, id, title, location, category,
-                                      start_time, end_time, google_map_link, description,
-                                      thumbnail, position)
-         SELECT ?1, d.value ->> 'id', i.value ->> 'id', i.value ->> 'title',
-                i.value ->> 'location', i.value ->> 'category', i.value ->> 'startTime',
-                i.value ->> 'endTime', i.value ->> 'googleMapLink', i.value -> 'description',
-                i.value ->> 'thumbnail', i.key
-         FROM json_each(?2) AS d, json_each(d.value, '$.items') AS i`
-      )
-      .bind(tripId, json),
-  ]);
-}

@@ -1,9 +1,12 @@
 import type { DataType, TripDataMap } from "@travel-pocket/shared";
-import { getInfo, replaceInfo } from "./info";
-import { getItinerary, replaceItinerary } from "./itinerary";
-import { getShops, replaceShops } from "./shops";
+import { getInfo } from "./info";
+import { getItinerary } from "./itinerary";
+import { runBatch } from "./run";
+import { getShops } from "./shops";
+import { replaceTripDataStatements } from "./writes";
 
-export { listTrips, tripExists, upsertTrips } from "./trips";
+export { createTrip, listTrips, tripIdsOwnedByOthers, tripOwnedBy, upsertTrips } from "./trips";
+export { ensureUser } from "./users";
 
 export function getTripData(
   db: D1Database,
@@ -20,20 +23,12 @@ export function getTripData(
   }
 }
 
-// `data` is only checked to be an array; the table constraints reject
-// elements with missing fields (reported as 400 by the app's error handler).
+/** Replaces the trip's data of one type in a single transaction. */
 export function replaceTripData(
   db: D1Database,
   tripId: string,
   type: DataType,
-  data: unknown[]
+  data: readonly unknown[]
 ): Promise<void> {
-  switch (type) {
-    case "itinerary":
-      return replaceItinerary(db, tripId, data as TripDataMap["itinerary"]);
-    case "shops":
-      return replaceShops(db, tripId, data as TripDataMap["shops"]);
-    case "info":
-      return replaceInfo(db, tripId, data as TripDataMap["info"]);
-  }
+  return runBatch(db, replaceTripDataStatements(tripId, type, data));
 }
