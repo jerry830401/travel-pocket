@@ -11,6 +11,7 @@
     {
       "binding": "DB",
       "database_name": "travel-pocket",
+      "database_id": "fc896377-3e1d-4dc4-9d33-8558643800d3",
       "migrations_dir": "migrations"
     }
   ],
@@ -26,8 +27,10 @@
     // the Application Audience (AUD) tag. While either is empty, no request
     // can authenticate with a JWT; local dev signs in as DEV_USER_EMAIL, which
     // the dev scripts pass with --var.
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_TEAM_DOMAIN": "chikawa-com.cloudflareaccess.com",
+    // The travel-pocket Worker's Access application (Workers & Pages →
+    // travel-pocket → Access → Application values).
+    "ACCESS_AUD": "c95dc8a9dfb1012fa753f4d0999f8990abd401f9d7c161d53ca76056d3f8ae59"
   },
   "dev": {
     "port": 8787
