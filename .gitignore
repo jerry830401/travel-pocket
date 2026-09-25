@@ -16,6 +16,10 @@ dist-ssr
 playwright-report
 test-results
 
+# Cloudflare Workers
+.wrangler
+.dev.vars
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
