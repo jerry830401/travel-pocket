@@ -340,20 +340,21 @@ export default [
 
 ---
 
-### gh-pages
+### wrangler
 
-**版本：** `^6.3.0`
+**版本：** `^4.140.0`
 
-自動將指定資料夾（通常為 `dist`）的內容推送至 GitHub 的 `gh-pages` 分支，實現一鍵部署至 GitHub Pages。
+Cloudflare Workers 的 CLI。前端部署成 `travel-pocket` Worker：`dist/` 當作 static assets，`/api/*` 由 `worker/index.ts` 經 service binding 轉給 API Worker。設定在 `apps/web/wrangler.jsonc`。
 
 ```bash
 # package.json scripts
-"predeploy": "pnpm run build",
-"deploy": "gh-pages -d dist"
+"preview:worker": "wrangler dev --port 8788",
+"deploy": "pnpm run build && wrangler deploy",
+"cf-typegen": "wrangler types worker/worker-configuration.d.ts"
 ```
 
 ```bash
-pnpm run deploy  # 建置後自動部署
+pnpm -F @travel-pocket/web run deploy  # 建置後部署到 Cloudflare
 ```
 
 ---

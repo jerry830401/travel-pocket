@@ -24,16 +24,16 @@ export default defineConfig({
         theme_color: "#1a3a5c",
         background_color: "#0f2340",
         display: "standalone",
-        scope: "/travel-pocket/",
-        start_url: "/travel-pocket/",
+        scope: "/",
+        start_url: "/",
         icons: [
           {
-            src: "/travel-pocket/icons/icon-192x192.svg",
+            src: "/icons/icon-192x192.svg",
             sizes: "192x192",
             type: "image/svg+xml",
           },
           {
-            src: "/travel-pocket/icons/icon-512x512.svg",
+            src: "/icons/icon-512x512.svg",
             sizes: "512x512",
             type: "image/svg+xml",
             purpose: "any maskable",
@@ -79,7 +79,7 @@ export default defineConfig({
       },
     }),
   ],
-  base: "/travel-pocket/",
+  base: "/",
   server: {
     host: true,
     // `pnpm dev` (mode fullstack) sets VITE_API_URL=/api; forward it to wrangler dev.

@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Served at https://travel-pocket.<subdomain>.workers.dev, which Cloudflare
+  // Access protects (enable it on this Worker's workers.dev route).
+  "name": "travel-pocket",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-20",
+  "assets": {
+    // Build first (`pnpm build`): the static app from vite build.
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Only API calls run the Worker; every other request is a static asset.
+    "run_worker_first": ["/api/*"]
+  },
+  // The API Worker (apps/api), which has no public URL of its own. Going
+  // through this binding keeps the app and its API on one origin.
+  "services": [{ "binding": "API", "service": "travel-pocket-api" }]
+}

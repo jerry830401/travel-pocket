@@ -2,7 +2,7 @@
 
 Guidance for `@travel-pocket/web`, the frontend PWA. Repo-wide rules — including the mandatory Isolation Rules — live in the root [CLAUDE.md](../../CLAUDE.md). Paths in this file are relative to `apps/web/`.
 
-Travel Pocket is a mobile-optimized PWA for managing travel itineraries, built with React + Vite and deployed to GitHub Pages.
+Travel Pocket is a mobile-optimized PWA for managing travel itineraries, built with React + Vite and deployed to Cloudflare Workers behind Cloudflare Access.
 
 ## Commands
 
@@ -18,13 +18,15 @@ pnpm -F @travel-pocket/web test:watch      # Vitest watch mode
 pnpm -F @travel-pocket/web test:coverage   # Vitest with V8 coverage report
 pnpm -F @travel-pocket/web test:e2e        # Playwright E2E tests (auto-starts dev server)
 pnpm -F @travel-pocket/web test:e2e:ui     # Playwright interactive UI
-pnpm -F @travel-pocket/web preview         # Preview the production build locally
-pnpm -F @travel-pocket/web run deploy      # Build then push dist/ via gh-pages (`run` is required: `pnpm deploy` is a pnpm built-in)
+pnpm -F @travel-pocket/web preview         # Preview the production build locally (vite preview, proxies /api like dev)
+pnpm -F @travel-pocket/web preview:worker  # Serve dist/ through the production Worker on :8788 (build first; start the API for /api)
+pnpm -F @travel-pocket/web run deploy      # Build, then wrangler deploy (`run` is required: `pnpm deploy` is a pnpm built-in)
+pnpm -F @travel-pocket/web cf-typegen      # Regenerate worker/worker-configuration.d.ts
 ```
 
 ## Routing
 
-Uses **HashRouter** (not BrowserRouter) — required for GitHub Pages static hosting. Routes follow the pattern `/#/trip/{tripId}/schedule`, `/#/trip/{tripId}/shops`, `/#/trip/{tripId}/info`.
+Uses **HashRouter** (not BrowserRouter): every route is served by `index.html`, so the static assets need no fallback rules. Routes follow the pattern `/#/trip/{tripId}/schedule`, `/#/trip/{tripId}/shops`, `/#/trip/{tripId}/info`.
 
 `TripView.tsx` is the nested layout shell; it fetches trip data and passes it down to child routes via `useOutletContext`.
 
@@ -94,12 +96,15 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 - Vitest setup file is at `src/test/setup.ts` — patches `matchMedia` for jsdom and runs `cleanup` after each test
 - Unit tests run without `VITE_API_URL`, so page tests exercise the static path by spying on `globalThis.fetch`. `src/dataSource.test.ts` covers API mode with `vi.stubEnv` plus a fresh `import()` after `vi.resetModules()`, because `dataSource.ts` reads `import.meta.env` at load time
 - `src/pages/Home.account.test.tsx` covers Home as a signed-in user (account line, add / delete trip, empty state, read-only data) by mocking `../dataSource` at the module boundary
-- E2E tests run against the dev server at `http://localhost:5173/travel-pocket/`; Playwright starts it automatically via `webServer` in `playwright.config.ts`. That is web's own `pnpm dev` (static mode), so E2E never needs the API
+- E2E tests run against the dev server at `http://localhost:5173/`; Playwright starts it automatically via `webServer` in `playwright.config.ts`. That is web's own `pnpm dev` (static mode), so E2E never needs the API
 
 ## Build & Deploy
 
-- Base path is `/travel-pocket/` (set in `vite.config.ts`) — required for GitHub Pages
+- Deployed to Cloudflare Workers as the `travel-pocket` Worker (`wrangler.jsonc`), at `https://travel-pocket.<subdomain>.workers.dev`, which Cloudflare Access protects. Static assets come from `dist/`. `assets.run_worker_first: ["/api/*"]` sends only API calls to `worker/index.ts`, which forwards them unchanged, Access headers included, to the API Worker (`travel-pocket-api`) through the `API` service binding, and answers 503 when that Worker is unreachable. The app and its API therefore share one origin.
+- `worker/` is typed with its own `tsconfig.worker.json` and the generated `worker/worker-configuration.d.ts` (`cf-typegen`); rerun it after changing `wrangler.jsonc`. `worker/index.test.ts` runs with the unit tests.
+- `.env.production` sets `VITE_API_URL=/api` for every `vite build`.
+- Base path is `/` (`vite.config.ts`, the PWA manifest, `index.html`).
 - TypeScript strict mode is on (`noUnusedLocals`, `noUnusedParameters`)
 - Tailwind typography plugin is used for markdown-style content in `Info.tsx`
 - Mobile-first layout: main container is capped at `max-width: 480px`
-- `.github/workflows/deploy.yml` (at the repo root) builds and publishes `dist/` to GitHub Pages on pushes to `master` that touch `apps/web/`, `packages/shared/`, `packages/data/`, or root workspace files
+- `.github/workflows/deploy.yml` (at the repo root) tests, builds and runs `wrangler deploy` on pushes to `master` that touch `apps/web/`, `packages/shared/`, `packages/data/`, or root workspace files. It needs the repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and the API Worker must already be deployed, since the service binding points at it.
