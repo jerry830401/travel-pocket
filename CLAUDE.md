@@ -10,7 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Travel Pocket is a mobile-optimized PWA (Progressive Web App) for managing travel itineraries. It is deployed to GitHub Pages and reads all trip data from static JSON files in `apps/web/public/data/`.
 
-The repo is a **pnpm workspace** monorepo. The frontend lives in `apps/web/` (package `@travel-pocket/web`); workspace globs are `apps/*` and `packages/*` (see `pnpm-workspace.yaml`). Unless noted otherwise, paths in the Architecture section are relative to `apps/web/`.
+The repo is a **pnpm workspace** monorepo (globs `apps/*` and `packages/*`, see `pnpm-workspace.yaml`):
+
+- `apps/web/` — the frontend (package `@travel-pocket/web`)
+- `packages/shared/` — data types and API contract constants shared across packages (package `@travel-pocket/shared`, consumed via `workspace:*`)
+
+Unless noted otherwise, paths in the Architecture section are relative to `apps/web/`.
 
 ## Commands
 
@@ -55,7 +60,9 @@ All trip data is **static JSON** fetched at runtime from `public/data/`:
 
 To add a new trip: add its folder under `public/data/`, populate the three JSON files, then add an entry to `trips.json`. No code changes are needed unless new data fields are introduced.
 
-All TypeScript interfaces for data structures are defined in [src/types.ts](apps/web/src/types.ts).
+All TypeScript interfaces for data structures are defined in [packages/shared/src/types.ts](packages/shared/src/types.ts); `src/types.ts` re-exports them so app code keeps importing from `../types`. Contract constants (`DATA_TYPES`, `ID_PATTERN`, `TripDataMap`) live in [packages/shared/src/contract.ts](packages/shared/src/contract.ts).
+
+`@travel-pocket/shared` ships TypeScript source (no build step). Relative imports inside it must keep the `.ts` extension, because `vite.config.ts` loads it through Node's native type stripping, which does not resolve extensionless paths.
 
 ### Theming
 
