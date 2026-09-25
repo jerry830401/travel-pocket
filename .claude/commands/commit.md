@@ -35,9 +35,11 @@ pnpm test:e2e
    
    <可選的詳細說明>
    
-   Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+   Co-Authored-By: Claude <模型名稱> <noreply@anthropic.com>
    ```
    type 使用：`feat` / `fix` / `refactor` / `test` / `ci` / `docs` / `chore`
+
+   `<模型名稱>` 填當下實際執行的模型（例如 `Opus 5.5`），不要沿用舊 commit 或寫死的型號。
 4. 執行 `git commit -m "..."`。
 
 ## 中止時的訊息範本
