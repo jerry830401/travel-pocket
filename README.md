@@ -19,7 +19,7 @@
 |---|---|
 | 前端 | React 19 + TypeScript 5.9（strict）、Vite 7、Tailwind CSS 3 |
 | 路由 | React Router 7（**HashRouter**） |
-| 動畫／時間／圖示 | framer-motion、date-fns、lucide-react |
+| 動畫 | framer-motion |
 | PWA | vite-plugin-pwa（Workbox） |
 | 後端 | Hono，跑在 Cloudflare Workers |
 | 資料庫 | Cloudflare D1 |

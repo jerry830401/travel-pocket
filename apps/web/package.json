@@ -21,10 +21,7 @@
   "dependencies": {
     "@travel-pocket/data": "workspace:*",
     "@travel-pocket/shared": "workspace:*",
-    "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
     "framer-motion": "^12.31.0",
-    "lucide-react": "^0.563.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
@@ -33,7 +30,6 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.59.1",
-    "@tailwindcss/typography": "^0.5.19",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

@@ -83,9 +83,6 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 | Library | Usage |
 |---|---|
 | `framer-motion` | Bottom sheet modal slide-up, page transitions |
-| `date-fns` | Time formatting and duration calculations in `Schedule.tsx` |
-| `lucide-react` | Category icons mapped by `ItineraryItem.category` string |
-| `clsx` | Conditional className construction |
 | `vite-plugin-pwa` | Service worker, offline caching of GET `/api/` responses (see [Offline](#offline)) |
 
 ## Testing
@@ -107,6 +104,5 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 - `.env.production` sets `VITE_API_URL=/api` for every `vite build`.
 - Base path is `/` (`vite.config.ts`, the PWA manifest, `index.html`).
 - TypeScript strict mode is on (`noUnusedLocals`, `noUnusedParameters`)
-- Tailwind typography plugin is used for markdown-style content in `Info.tsx`
 - Mobile-first layout: main container is capped at `max-width: 480px`
 - `.github/workflows/deploy.yml` (at the repo root) tests, builds and runs `wrangler deploy` on pushes to `master` that touch `apps/web/`, `packages/shared/`, `packages/data/`, or root workspace files. It needs the repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, and the API Worker must already be deployed, since the service binding points at it.
