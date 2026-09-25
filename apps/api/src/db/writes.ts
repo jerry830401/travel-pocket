@@ -54,6 +54,11 @@ export function insertTripStatement(ownerId: string, trip: Trip): Statement {
   };
 }
 
+/** Deletes one of the owner's trips; its itinerary, shops and info cascade. */
+export function deleteTripStatement(ownerId: string, tripId: string): Statement {
+  return { sql: "DELETE FROM trips WHERE id = ?1 AND owner_id = ?2", params: [tripId, ownerId] };
+}
+
 // Deleting the days cascades to their items. Run as one batch (one transaction).
 function replaceItineraryStatements(tripId: string, days: readonly ItineraryDay[]): Statement[] {
   const json = JSON.stringify(days);

@@ -5,7 +5,14 @@ import { runBatch } from "./run";
 import { getShops } from "./shops";
 import { replaceTripDataStatements } from "./writes";
 
-export { createTrip, listTrips, tripIdsOwnedByOthers, tripOwnedBy, upsertTrips } from "./trips";
+export {
+  createTrip,
+  deleteTrip,
+  listTrips,
+  tripIdsOwnedByOthers,
+  tripOwnedBy,
+  upsertTrips,
+} from "./trips";
 export { ensureUser } from "./users";
 
 export function getTripData(

@@ -6,6 +6,7 @@ import type { DataType, Me, NewTrip, Trip } from "@travel-pocket/shared";
 import { requireUser, type AppEnv } from "./auth";
 import {
   createTrip,
+  deleteTrip,
   getTripData,
   listTrips,
   replaceTripData,
@@ -27,7 +28,7 @@ app.use(
   cors({
     origin: (origin, c: Context<AppEnv>) =>
       allowedOrigins(c.env).includes(origin) ? origin : null,
-    allowMethods: ["GET", "POST", "PUT"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE"],
     allowHeaders: ["Content-Type"],
   })
 );
@@ -121,6 +122,16 @@ app.put("/trips", async (c) => {
   const taken = await tripIdsOwnedByOthers(c.env.DB, trips.map((trip) => trip.id), userId);
   if (taken.length > 0) throw new HTTPException(409, { message: "Trip id already in use" });
   await upsertTrips(c.env.DB, userId, trips);
+  return c.json({ ok: true });
+});
+
+// The trip's itinerary, shops and info go with it (ON DELETE CASCADE).
+app.delete("/trips/:tripId", async (c) => {
+  const tripId = c.req.param("tripId");
+  if (!ID_PATTERN.test(tripId)) throw new HTTPException(400, { message: "Invalid tripId" });
+  if (!(await deleteTrip(c.env.DB, c.get("userId"), tripId))) {
+    throw new HTTPException(404, { message: "Trip not found" });
+  }
   return c.json({ ok: true });
 });
 

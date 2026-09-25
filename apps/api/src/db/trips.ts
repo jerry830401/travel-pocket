@@ -1,6 +1,6 @@
 import type { NewTrip, Trip } from "@travel-pocket/shared";
 import { run } from "./run";
-import { insertTripStatement, upsertTripsStatement } from "./writes";
+import { deleteTripStatement, insertTripStatement, upsertTripsStatement } from "./writes";
 
 export interface TripRow {
   id: string;
@@ -63,6 +63,12 @@ export async function upsertTrips(
   trips: readonly Trip[]
 ): Promise<void> {
   await run(db, upsertTripsStatement(ownerId, trips));
+}
+
+/** Deletes the trip if it belongs to the owner; false when there was none to delete. */
+export async function deleteTrip(db: D1Database, ownerId: string, tripId: string): Promise<boolean> {
+  const { meta } = await run(db, deleteTripStatement(ownerId, tripId));
+  return meta.changes > 0;
 }
 
 function newTripId(): string {

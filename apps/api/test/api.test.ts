@@ -112,10 +112,11 @@ describe("authentication", () => {
     ["GET", "/trips"],
     ["POST", "/trips"],
     ["PUT", "/trips"],
+    ["DELETE", "/trips/sendai-2026"],
     ["GET", "/trips/sendai-2026/shops"],
     ["PUT", "/trips/sendai-2026/shops"],
   ])("rejects %s %s without an Access JWT", async (method, path) => {
-    const body = method === "GET" ? undefined : [];
+    const body = method === "GET" || method === "DELETE" ? undefined : [];
     expect((await api(path, { method, body })).status).toBe(401);
   });
 
@@ -256,6 +257,54 @@ describe("POST /trips", () => {
   ])("rejects a body with %s", async (_, body) => {
     expect((await api("/trips", { method: "POST", body, as: ALICE })).status).toBe(400);
     expect(await json(api("/trips", { as: ALICE }))).toEqual([]);
+  });
+});
+
+describe("DELETE /trips/:tripId", () => {
+  async function countRows(table: string, tripId: string): Promise<number | null> {
+    return env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE trip_id = ?`)
+      .bind(tripId)
+      .first<number>("n");
+  }
+
+  it("deletes the trip together with its itinerary, shops and info", async () => {
+    await seedTrips();
+    await api("/trips/sendai-2026/itinerary", { method: "PUT", body: itinerary, as: ALICE });
+    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
+    await api("/trips/sendai-2026/info", { method: "PUT", body: info, as: ALICE });
+
+    const res = await api("/trips/sendai-2026", { method: "DELETE", as: ALICE });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([trips[1]]);
+    expect((await api("/trips/sendai-2026/shops", { as: ALICE })).status).toBe(404);
+    for (const table of ["itinerary_days", "itinerary_items", "shops", "info_items"]) {
+      expect(await countRows(table, "sendai-2026")).toBe(0);
+    }
+  });
+
+  it("keeps the user's other trips and their data", async () => {
+    await seedTrips();
+    await api("/trips/kyushu-2024/shops", { method: "PUT", body: shops, as: ALICE });
+    await api("/trips/sendai-2026", { method: "DELETE", as: ALICE });
+    expect(await json(api("/trips/kyushu-2024/shops", { as: ALICE }))).toStrictEqual(shops);
+  });
+
+  it("answers 404 for another user's trip and leaves it alone", async () => {
+    await seedTrips(ALICE);
+    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
+    expect((await api("/trips/sendai-2026", { method: "DELETE", as: BOB })).status).toBe(404);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(trips);
+    expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
+  });
+
+  it("answers 404 for a trip that does not exist", async () => {
+    expect((await api("/trips/nowhere", { method: "DELETE", as: ALICE })).status).toBe(404);
+  });
+
+  it("returns 400 for an invalid tripId", async () => {
+    expect((await api("/trips/bad.id", { method: "DELETE", as: ALICE })).status).toBe(400);
   });
 });
 
@@ -411,6 +460,7 @@ describe("CORS", () => {
     expect(res.status).toBe(204);
     expect(res.headers.get("Access-Control-Allow-Methods")).toMatch(/POST/);
     expect(res.headers.get("Access-Control-Allow-Methods")).toMatch(/PUT/);
+    expect(res.headers.get("Access-Control-Allow-Methods")).toMatch(/DELETE/);
     expect(res.headers.get("Access-Control-Allow-Headers")).toMatch(/Content-Type/i);
   });
 });

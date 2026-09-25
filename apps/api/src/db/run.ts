@@ -4,8 +4,8 @@ function prepare(db: D1Database, { sql, params }: Statement): D1PreparedStatemen
   return db.prepare(sql).bind(...params);
 }
 
-export async function run(db: D1Database, statement: Statement): Promise<void> {
-  await prepare(db, statement).run();
+export function run(db: D1Database, statement: Statement): Promise<D1Result> {
+  return prepare(db, statement).run();
 }
 
 /** Runs the statements as one batch, which D1 executes as a single transaction. */
