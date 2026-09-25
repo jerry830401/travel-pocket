@@ -17,6 +17,7 @@ Travel Pocket is a mobile-optimized PWA for managing travel itineraries. The rep
 | Path | Package | Role | Deploy target | Guide |
 |---|---|---|---|---|
 | `apps/web/` | `@travel-pocket/web` | Frontend PWA (React + Vite) | GitHub Pages | [apps/web/CLAUDE.md](apps/web/CLAUDE.md) |
+| `apps/api/` | `@travel-pocket/api` | Backend API (Hono + D1) | Cloudflare Workers | [apps/api/CLAUDE.md](apps/api/CLAUDE.md) |
 | `packages/shared/` | `@travel-pocket/shared` | Data types and API contract | — (consumed via `workspace:*`) | [packages/shared/CLAUDE.md](packages/shared/CLAUDE.md) |
 | `packages/data/` | `@travel-pocket/data` | Trip data (JSON) | — (consumed via `workspace:*`) | [packages/data/CLAUDE.md](packages/data/CLAUDE.md) |
 
@@ -59,6 +60,7 @@ Run from the repo root:
 ```bash
 pnpm dev          # Start the web dev server (same as pnpm dev:web)
 pnpm dev:web      # Start the web dev server only
+pnpm dev:api      # Start the API (wrangler dev on :8787, local D1) only
 pnpm build        # Run build in every workspace package
 pnpm lint         # Run ESLint in every workspace package
 pnpm test         # Run unit tests in every workspace package

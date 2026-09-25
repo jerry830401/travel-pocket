@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "travel-pocket-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-20",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "travel-pocket",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "secrets": {
+    // Local dev reads it from .dev.vars; production uses `wrangler secret put`.
+    "required": ["ADMIN_TOKEN"]
+  },
+  "vars": {
+    // Comma-separated list of origins allowed to call the API from a browser.
+    "CORS_ORIGINS": "http://localhost:5173,http://localhost:4173"
+  },
+  "dev": {
+    "port": 8787
+  }
+}
