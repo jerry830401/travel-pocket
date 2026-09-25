@@ -20,6 +20,9 @@ test-results
 .wrangler
 .dev.vars
 
+# Claude Code personal settings
+.claude/settings.local.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
