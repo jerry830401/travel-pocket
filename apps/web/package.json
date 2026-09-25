@@ -18,6 +18,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@travel-pocket/data": "workspace:*",
     "@travel-pocket/shared": "workspace:*",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

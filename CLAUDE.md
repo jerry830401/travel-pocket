@@ -18,6 +18,7 @@ Travel Pocket is a mobile-optimized PWA for managing travel itineraries. The rep
 |---|---|---|---|---|
 | `apps/web/` | `@travel-pocket/web` | Frontend PWA (React + Vite) | GitHub Pages | [apps/web/CLAUDE.md](apps/web/CLAUDE.md) |
 | `packages/shared/` | `@travel-pocket/shared` | Data types and API contract | — (consumed via `workspace:*`) | [packages/shared/CLAUDE.md](packages/shared/CLAUDE.md) |
+| `packages/data/` | `@travel-pocket/data` | Trip data (JSON) | — (consumed via `workspace:*`) | [packages/data/CLAUDE.md](packages/data/CLAUDE.md) |
 
 `apps/*` holds deployable applications; `packages/*` holds libraries that apps depend on. The root `package.json` only contains workspace-level scripts — no application code and no application dependencies.
 
