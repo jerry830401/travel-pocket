@@ -2,6 +2,8 @@
 
 行動裝置優先的旅遊手冊 PWA。用 Google 帳號登入（Cloudflare Access）後，每個人管理自己的行程；前端和 API 都部署在 Cloudflare Workers，資料存在 Cloudflare D1。可以安裝到手機主畫面，離線時也看得到最後讀到的資料。
 
+🔗 https://travel-pocket.travel-pocket-web.workers.dev（需要 Google 帳號登入）
+
 ## 功能
 
 - **行程表** — 依日期分頁，顯示標題、地點、類別貼紙、起訖時間與行程間的空檔；點擊項目由下往上彈出詳細資訊，地點可外連 Google Map。
@@ -177,7 +179,7 @@ E2E 針對 `http://localhost:5173/` 的 `dev:web`（範例 JSON、唯讀）執�
 
 全部部署在 Cloudflare：
 
-- **`travel-pocket`**（`apps/web`）— 提供前端的 static assets；只有 `/api/*` 會進到 `worker/index.ts`，經 service binding 轉給 API。網址是 `https://travel-pocket.<subdomain>.workers.dev`，由 Cloudflare Access 保護，要用 Google 帳號登入才進得去。
+- **`travel-pocket`**（`apps/web`）— 提供前端的 static assets；只有 `/api/*` 會進到 `worker/index.ts`，經 service binding 轉給 API。網址是 https://travel-pocket.travel-pocket-web.workers.dev，由 Cloudflare Access 保護，要用 Google 帳號登入才進得去。
 - **`travel-pocket-api`**（`apps/api`）— 沒有自己的公開網址，只能經由前端的 service binding 存取；它驗證 Access 帶來的 JWT，資料存在 D1。
 
 推送到 `master` 時，兩個 workflow 依路徑各自觸發：[`deploy.yml`](.github/workflows/deploy.yml)（前端）與 [`deploy-api.yml`](.github/workflows/deploy-api.yml)（API，先套用 D1 migrations 再部署）。兩者都需要 repo secrets `CLOUDFLARE_API_TOKEN` 與 `CLOUDFLARE_ACCOUNT_ID`。
@@ -187,7 +189,7 @@ E2E 針對 `http://localhost:5173/` 的 `dev:web`（範例 JSON、唯讀）執�
 1. `wrangler login`，再用 `wrangler d1 create travel-pocket` 建立資料庫，把 `database_id` 填進 `apps/api/wrangler.jsonc`。
 2. `pnpm -F @travel-pocket/api db:migrate:remote`，接著 `pnpm -F @travel-pocket/api run deploy`。
 3. `pnpm -F @travel-pocket/web run deploy`（API 要先部署，service binding 才找得到它）。
-4. 在 Zero Trust 加入 Google 登入方式；到 `travel-pocket` Worker 的設定（Domains & Routes）為 `workers.dev` 啟用 Cloudflare Access，policy 允許任何用 Google 登入的使用者，並設定 seat expiration（免費方案 50 個名額）。
+4. 在 Zero Trust 的 Integrations → Identity providers 加入 Google，並建立一個允許任何以 Google 登入者的 reusable policy。到 Workers & Pages → `travel-pocket` → **Access** 分頁，選 Protect this Worker behind Access（All traffic）並套用這個 policy。再到 Access 應用程式把登入方式只留 Google、**關閉 instant authentication**（讓使用者在登入頁自己按 Google），最後在 Settings → Admin controls 設定 seat expiration（免費方案 50 個名額）。
 5. 把 Zero Trust 的團隊網域與 Access 應用程式的 AUD 填進 `apps/api/wrangler.jsonc` 的 `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`，重新部署 API。
 6. 用 `pnpm -F @travel-pocket/api db:seed --owner <你的 email> --remote` 匯入現有行程。
 
