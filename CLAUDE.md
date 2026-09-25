@@ -6,91 +6,59 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 所有回應請使用**繁體中文**。
 
-## Project Overview
+## Repository Layout
 
-Travel Pocket is a mobile-optimized PWA (Progressive Web App) for managing travel itineraries. It is deployed to GitHub Pages and reads all trip data from static JSON files in `apps/web/public/data/`.
+Travel Pocket is a mobile-optimized PWA for managing travel itineraries. The repo is a **pnpm workspace** monorepo (globs `apps/*` and `packages/*`, see `pnpm-workspace.yaml`):
 
-The repo is a **pnpm workspace** monorepo (globs `apps/*` and `packages/*`, see `pnpm-workspace.yaml`):
+| Path | Package | Role | Deploy target | Guide |
+|---|---|---|---|---|
+| `apps/web/` | `@travel-pocket/web` | Frontend PWA (React + Vite) | GitHub Pages | [apps/web/CLAUDE.md](apps/web/CLAUDE.md) |
+| `packages/shared/` | `@travel-pocket/shared` | Data types and API contract | — (consumed via `workspace:*`) | [packages/shared/CLAUDE.md](packages/shared/CLAUDE.md) |
 
-- `apps/web/` — the frontend (package `@travel-pocket/web`)
-- `packages/shared/` — data types and API contract constants shared across packages (package `@travel-pocket/shared`, consumed via `workspace:*`)
+`apps/*` holds deployable applications; `packages/*` holds libraries that apps depend on. The root `package.json` only contains workspace-level scripts — no application code and no application dependencies.
 
-Unless noted otherwise, paths in the Architecture section are relative to `apps/web/`.
+This file holds only repo-wide rules. Each workspace keeps its own architecture, commands, and conventions in its own `CLAUDE.md`; **read that file before changing anything inside the workspace**, and keep package-specific guidance there rather than here.
+
+## Isolation Rules (mandatory)
+
+Frontend, backend, and any app added later **must be developed in complete isolation**. Treat every directory under `apps/` as if it lived in its own repository that happens to share `packages/`. These rules apply to every change:
+
+1. **No cross-app imports.** An app never imports from another app — not by relative path (`../../apps/...`) and not by package name (`@travel-pocket/<other-app>`). An app never lists another app as a dependency.
+2. **Share only through `packages/`.** Anything two or more apps need (types, API contract, validation constants) goes into a package under `packages/` and is consumed via `workspace:*`. Never copy code between apps and never reach into another app's source.
+3. **Apps talk only through the contract.** Cross-app communication happens over the API defined in `packages/shared`. An app never reads another app's files at runtime or build time (e.g. a backend must not read `apps/web/public/data/`); data that must be shared moves into a package.
+4. **Packages stay runtime-agnostic.** Code in `packages/` must run in the browser, Node, and Cloudflare Workers alike: no DOM, Node, or Workers APIs, and no framework dependencies (React, Hono, …).
+5. **Each app owns its dependencies and config.** Every app has its own `package.json`, `tsconfig*.json`, ESLint config, test config, and `CLAUDE.md`. Declare a dependency in the app that uses it — never in the root `package.json`, and never rely on a dependency hoisted in from another package. Don't extend another app's config; extract a shared config package under `packages/` if one is ever needed.
+6. **Each app runs on its own.** `dev`, `build`, `lint`, `test`, and deploy must succeed for one app via `pnpm -F <package> <script>` without any other app running or built. An app that consumes another app's API must degrade gracefully when that API is unavailable, and its tests mock the API at the network boundary using the shared contract types — never by importing the other app.
+7. **Each app deploys on its own.** Each app has its own GitHub Actions workflow whose `paths` filter lists only that app's directory, the packages it depends on, and root workspace files; it installs with `pnpm install --frozen-lockfile --filter <package>...`. `.github/workflows/deploy.yml` is the reference for `apps/web`.
+8. **Keep changes scoped.** A commit or PR should touch one app, plus `packages/` only when the contract itself changes. When changing a package, verify every app that depends on it:
+
+   ```bash
+   pnpm -F "...@travel-pocket/shared" build   # the package and all its dependents
+   pnpm -F "...@travel-pocket/shared" test
+   ```
+
+### Adding a new app
+
+1. Create `apps/<name>/` with package name `@travel-pocket/<name>`.
+2. Give it `dev`, `build`, `lint`, and `test` scripts so the recursive root commands pick it up.
+3. Add its own `tsconfig*.json`, ESLint config, and test config.
+4. Depend on `@travel-pocket/shared` (`workspace:*`) if it needs the data types or contract; add new shared types there, not in the app.
+5. Add a `dev:<name>` script to the root `package.json`.
+6. Add its own workflow under `.github/workflows/` following rule 7.
+7. Write `apps/<name>/CLAUDE.md` (link back to this file for the Isolation Rules), then add a row to the Repository Layout table above.
 
 ## Commands
 
 Run from the repo root:
 
 ```bash
-pnpm dev          # Start the web Vite dev server with HMR (same as pnpm dev:web)
-pnpm dev:web      # Start the web Vite dev server only
-pnpm build        # Run build in every workspace package (web: tsc + Vite build to apps/web/dist/)
+pnpm dev          # Start the web dev server (same as pnpm dev:web)
+pnpm dev:web      # Start the web dev server only
+pnpm build        # Run build in every workspace package
 pnpm lint         # Run ESLint in every workspace package
+pnpm test         # Run unit tests in every workspace package
+pnpm test:e2e     # Run web Playwright E2E tests (auto-starts dev server)
 pnpm preview      # Preview the web production build locally
-
-pnpm test              # Run Vitest unit tests in every workspace package
-pnpm test:e2e          # Run web Playwright E2E tests (auto-starts dev server)
 ```
 
-Other web scripts run through a filter:
-
-```bash
-pnpm -F @travel-pocket/web test:watch      # Vitest watch mode
-pnpm -F @travel-pocket/web test:coverage   # Vitest with V8 coverage report
-pnpm -F @travel-pocket/web test:e2e:ui     # Playwright interactive UI
-pnpm -F @travel-pocket/web run deploy      # Build then push dist/ via gh-pages (`run` is required: `pnpm deploy` is a pnpm built-in)
-```
-
-## Architecture
-
-### Routing
-
-Uses **HashRouter** (not BrowserRouter) — required for GitHub Pages static hosting. Routes follow the pattern `/#/trip/{tripId}/schedule`, `/#/trip/{tripId}/shops`, `/#/trip/{tripId}/info`.
-
-`TripView.tsx` is the nested layout shell; it fetches trip data and passes it down to child routes via `useOutletContext`.
-
-### Data
-
-All trip data is **static JSON** fetched at runtime from `public/data/`:
-
-- `trips.json` — Array of `Trip` metadata (id, name, dates, cover image, snapshot path)
-- `{tripId}/itinerary.json` — `ItineraryDay[]` (array of days, each with `ItineraryItem[]`)
-- `{tripId}/shops.json` — `Shop[]`
-- `{tripId}/info.json` — `InfoItem[]`
-
-To add a new trip: add its folder under `public/data/`, populate the three JSON files, then add an entry to `trips.json`. No code changes are needed unless new data fields are introduced.
-
-All TypeScript interfaces for data structures are defined in [packages/shared/src/types.ts](packages/shared/src/types.ts); `src/types.ts` re-exports them so app code keeps importing from `../types`. Contract constants (`DATA_TYPES`, `ID_PATTERN`, `TripDataMap`) live in [packages/shared/src/contract.ts](packages/shared/src/contract.ts).
-
-`@travel-pocket/shared` ships TypeScript source (no build step). Relative imports inside it must keep the `.ts` extension, because `vite.config.ts` loads it through Node's native type stripping, which does not resolve extensionless paths.
-
-### Theming
-
-Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/writes `localStorage` and respects `prefers-color-scheme` as a default. All Tailwind dark variants use `dark:` prefix.
-
-### Key Libraries
-
-| Library | Usage |
-|---|---|
-| `framer-motion` | Bottom sheet modal slide-up, page transitions |
-| `date-fns` | Time formatting and duration calculations in `Schedule.tsx` |
-| `lucide-react` | Category icons mapped by `ItineraryItem.category` string |
-| `clsx` | Conditional className construction |
-| `vite-plugin-pwa` | Service worker, offline caching (7-day expiry for JSON data) |
-
-### Testing
-
-| Layer | Tool | Location |
-|---|---|---|
-| Unit / component | Vitest + React Testing Library + jsdom | `src/**/*.test.tsx` |
-| E2E | Playwright (Chromium only) | `e2e/*.spec.ts` |
-
-- Vitest setup file is at `src/test/setup.ts` — patches `matchMedia` for jsdom and runs `cleanup` after each test
-- E2E tests run against the dev server at `http://localhost:5173/travel-pocket/`; Playwright starts it automatically via `webServer` in `playwright.config.ts`
-
-### Build Notes
-
-- Base path is `/travel-pocket/` (set in `vite.config.ts`) — required for GitHub Pages
-- TypeScript strict mode is on (`noUnusedLocals`, `noUnusedParameters`)
-- Tailwind typography plugin is used for markdown-style content in `Info.tsx`
-- Mobile-first layout: main container is capped at `max-width: 480px`
+`build`, `lint`, and `test` run recursively (`pnpm -r`). When working on a single workspace, target it with `pnpm -F <package> <script>` instead; each workspace's `CLAUDE.md` lists its own scripts.
