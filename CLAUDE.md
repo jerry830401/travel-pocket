@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Issue Workflow (mandatory)
 
-Before evaluating, planning, or changing any file, follow [.claude/skills/issue-workflow/SKILL.md](.claude/skills/issue-workflow/SKILL.md): check the GitHub issues (or the issue number the user named) first. Always ask the user before creating, commenting on, editing, or closing an issue.
+Before evaluating, planning, or changing any file, follow [.claude/skills/issue-workflow/SKILL.md](.claude/skills/issue-workflow/SKILL.md): check the GitHub issues (or the issue number the user named) first. Always ask the user before creating, commenting on, editing, or closing an issue — the only exception is ticking checkboxes for work that is done and verified.
 
 ## Repository Layout
 

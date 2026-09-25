@@ -1,11 +1,11 @@
 ---
 name: issue-workflow
-description: 在這個 repo 評估需求、規劃或改任何檔案前使用。先查 GitHub issues，或使用者指定的 #編號。開新 issue、留言、編輯或關閉 issue 前一律先問使用者。使用者提到 issue 編號，或要求評估、規劃、實作、修正時觸發。
+description: 在這個 repo 評估需求、規劃或改任何檔案前使用。先查 GitHub issues，或使用者指定的 #編號。開新 issue、留言、編輯或關閉 issue 前一律先問使用者；只有勾選已完成且驗證過的 checkbox 可以直接做。使用者提到 issue 編號，或要求評估、規劃、實作、修正時觸發。
 ---
 
 # Issue Workflow
 
-這個 repo 的工作都照 GitHub issue 規劃來做。評估、規劃、改動前，先對照 issue；**任何寫入 issue 的動作都要先取得使用者同意。**
+這個 repo 的工作都照 GitHub issue 規劃來做。評估、規劃、改動前，先對照 issue；**寫入 issue 的動作都要先取得使用者同意，只有勾選已完成且驗證過的 checkbox 例外（見第 4 步）。**
 
 ## 0. gh 指令
 
@@ -52,11 +52,16 @@ description: 在這個 repo 評估需求、規劃或改任何檔案前使用。�
 2. 用 AskUserQuestion 附上草稿，提供這些選項：開新 issue、併入現有 #N、不開 issue 直接做、先不做。
 3. **使用者明確同意前，不執行 `gh issue create`。** 內文先寫進 scratchpad 檔案，再用 `--body-file` 傳入。
 
-其他寫入 issue 的動作也要先問：留言、修改內文或勾選 checkbox、關閉或重開、改 label。
+其他寫入 issue 的動作也要先問：留言、修改內文（勾選 checkbox 以外的改動）、關閉或重開、改 label。
 
 ## 4. 實作中與收尾
 
 - 實作中發現 issue 範圍外的問題：停下來回報，不擴大範圍。
 - commit message 加 `Refs #N`。
 - PR 描述寫 `Closes #N`；追蹤 issue 底下的工作再加 `Part of #6`。
-- 完成後逐條對照「驗收條件」回報結果。要勾選 checkbox 或留言，照第 3 步先問。
+- 完成後逐條對照「驗收條件」回報結果。
+- **勾選 checkbox 不用先問**：工作項目已完成、驗收條件已實際驗證通過的，直接勾選。
+  - 只勾真的做完並驗證過的；沒驗證、只做一部分、或驗證失敗的保持不勾，並說明原因。
+  - 只能把 `- [ ]` 改成 `- [x]`，內文其他地方一個字都不動。先讀出目前的 body，替換後寫進 scratchpad 檔案，再用 `gh issue edit <N> -R jerry830401/travel-pocket --body-file <檔案>` 更新。
+  - 勾完後回報勾了哪些、還剩哪些沒勾。
+  - 留言、改其他內文、關閉 issue 仍要照第 3 步先問。
