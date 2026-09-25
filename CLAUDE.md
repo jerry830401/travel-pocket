@@ -16,8 +16,8 @@ Travel Pocket is a mobile-optimized PWA for managing travel itineraries. The rep
 
 | Path | Package | Role | Deploy target | Guide |
 |---|---|---|---|---|
-| `apps/web/` | `@travel-pocket/web` | Frontend PWA (React + Vite) | GitHub Pages | [apps/web/CLAUDE.md](apps/web/CLAUDE.md) |
-| `apps/api/` | `@travel-pocket/api` | Backend API (Hono + D1) | Cloudflare Workers | [apps/api/CLAUDE.md](apps/api/CLAUDE.md) |
+| `apps/web/` | `@travel-pocket/web` | Frontend PWA (React + Vite) | Cloudflare Workers (static assets, behind Cloudflare Access) | [apps/web/CLAUDE.md](apps/web/CLAUDE.md) |
+| `apps/api/` | `@travel-pocket/api` | Backend API (Hono + D1) | Cloudflare Workers (no public URL; reached through web's service binding) | [apps/api/CLAUDE.md](apps/api/CLAUDE.md) |
 | `packages/shared/` | `@travel-pocket/shared` | Data types and API contract | — (consumed via `workspace:*`) | [packages/shared/CLAUDE.md](packages/shared/CLAUDE.md) |
 | `packages/data/` | `@travel-pocket/data` | Trip data (JSON) | — (consumed via `workspace:*`) | [packages/data/CLAUDE.md](packages/data/CLAUDE.md) |
 
@@ -35,7 +35,7 @@ Frontend, backend, and any app added later **must be developed in complete isola
 4. **Packages stay runtime-agnostic.** Code in `packages/` must run in the browser, Node, and Cloudflare Workers alike: no DOM, Node, or Workers APIs, and no framework dependencies (React, Hono, …).
 5. **Each app owns its dependencies and config.** Every app has its own `package.json`, `tsconfig*.json`, ESLint config, test config, and `CLAUDE.md`. Declare a dependency in the app that uses it — never in the root `package.json`, and never rely on a dependency hoisted in from another package. Don't extend another app's config; extract a shared config package under `packages/` if one is ever needed.
 6. **Each app runs on its own.** `dev`, `build`, `lint`, `test`, and deploy must succeed for one app via `pnpm -F <package> <script>` without any other app running or built. An app that consumes another app's API must degrade gracefully when that API is unavailable, and its tests mock the API at the network boundary using the shared contract types — never by importing the other app.
-7. **Each app deploys on its own.** Each app has its own GitHub Actions workflow whose `paths` filter lists only that app's directory, the packages it depends on, and root workspace files; it installs with `pnpm install --frozen-lockfile --filter <package>...`. `.github/workflows/deploy.yml` is the reference for `apps/web`.
+7. **Each app deploys on its own.** Each app has its own GitHub Actions workflow whose `paths` filter lists only that app's directory, the packages it depends on, and root workspace files; it installs with `pnpm install --frozen-lockfile --filter <package>...`. `.github/workflows/deploy.yml` (`apps/web`) and `.github/workflows/deploy-api.yml` (`apps/api`) are the references. A deploy-time link between apps, like web's service binding to the API Worker, is fine: it is still HTTP through the contract, not shared code.
 8. **Keep changes scoped.** A commit or PR should touch one app, plus `packages/` only when the contract itself changes. When changing a package, verify every app that depends on it:
 
    ```bash
