@@ -51,7 +51,6 @@ const shops: Shop[] = [
     location: "一番町",
     tags: ["百貨"],
     businessHours: "10:00-19:00",
-    googleMapLink: "https://maps.example/shop-1",
   },
 ];
 

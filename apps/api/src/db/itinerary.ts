@@ -14,9 +14,7 @@ export interface ItineraryItemRow {
   category: string;
   start_time: string;
   end_time: string;
-  google_map_link: string | null;
   description: string | null; // JSON text
-  thumbnail: string | null;
 }
 
 export function toItineraryItem(row: ItineraryItemRow): ItineraryItem {
@@ -29,9 +27,7 @@ export function toItineraryItem(row: ItineraryItemRow): ItineraryItem {
     startTime: row.start_time,
     endTime: row.end_time,
   };
-  if (row.google_map_link !== null) item.googleMapLink = row.google_map_link;
   if (row.description !== null) item.description = JSON.parse(row.description) as string | string[];
-  if (row.thumbnail !== null) item.thumbnail = row.thumbnail;
   return item;
 }
 
@@ -47,8 +43,7 @@ export async function getItinerary(db: D1Database, tripId: string): Promise<Itin
       .all<ItineraryDayRow>(),
     db
       .prepare(
-        `SELECT day_id, id, title, location, category, start_time, end_time,
-                google_map_link, description, thumbnail
+        `SELECT day_id, id, title, location, category, start_time, end_time, description
          FROM itinerary_items WHERE trip_id = ? ORDER BY position`
       )
       .bind(tripId)

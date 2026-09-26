@@ -98,12 +98,10 @@ function replaceItineraryStatements(tripId: string, days: readonly ItineraryDay[
     },
     {
       sql: `INSERT INTO itinerary_items (trip_id, day_id, id, title, location, category,
-                                         start_time, end_time, google_map_link, description,
-                                         thumbnail, position)
+                                         start_time, end_time, description, position)
             SELECT ?1, d.value ->> 'id', i.value ->> 'id', i.value ->> 'title',
                    i.value ->> 'location', i.value ->> 'category', i.value ->> 'startTime',
-                   i.value ->> 'endTime', i.value ->> 'googleMapLink', i.value -> 'description',
-                   i.value ->> 'thumbnail', i.key
+                   i.value ->> 'endTime', i.value -> 'description', i.key
             FROM json_each(?2) AS d, json_each(d.value, '$.items') AS i`,
       params: [tripId, json],
     },
@@ -114,10 +112,9 @@ function replaceShopsStatements(tripId: string, shops: readonly Shop[]): Stateme
   return [
     { sql: "DELETE FROM shops WHERE trip_id = ?1", params: [tripId] },
     {
-      sql: `INSERT INTO shops (trip_id, id, name, location, tags, business_hours,
-                               google_map_link, position)
+      sql: `INSERT INTO shops (trip_id, id, name, location, tags, business_hours, position)
             SELECT ?1, value ->> 'id', value ->> 'name', value ->> 'location', value -> 'tags',
-                   value ->> 'businessHours', value ->> 'googleMapLink', key
+                   value ->> 'businessHours', key
             FROM json_each(?2)`,
       params: [tripId, JSON.stringify(shops)],
     },

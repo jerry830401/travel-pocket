@@ -6,7 +6,6 @@ export interface ShopRow {
   location: string;
   tags: string; // JSON text
   business_hours: string;
-  google_map_link: string;
 }
 
 export function toShop(row: ShopRow): Shop {
@@ -16,14 +15,13 @@ export function toShop(row: ShopRow): Shop {
     location: row.location,
     tags: JSON.parse(row.tags) as string[],
     businessHours: row.business_hours,
-    googleMapLink: row.google_map_link,
   };
 }
 
 export async function getShops(db: D1Database, tripId: string): Promise<Shop[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, name, location, tags, business_hours, google_map_link
+      `SELECT id, name, location, tags, business_hours
        FROM shops WHERE trip_id = ? ORDER BY position`
     )
     .bind(tripId)

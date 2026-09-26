@@ -136,14 +136,13 @@ pnpm workspace monorepo。`apps/*` 是各自獨立開發、測試、部署的應
       "category": "planeTakeoff",
       "startTime": "10:30",
       "endTime": "13:25",
-      "googleMapLink": "",       // 選填
       "description": ["…"]       // 選填，字串或字串陣列
     }
   ]
 }
 
 // shops.json — Shop[]
-{ "id": "…", "name": "…", "location": "…", "tags": ["甜點"], "businessHours": "10:00–19:00", "googleMapLink": "…" }
+{ "id": "…", "name": "…", "location": "…", "tags": ["甜點"], "businessHours": "10:00–19:00" }
 
 // info.json — InfoItem[]
 { "id": "…", "title": "出入境", "icon": "🛂", "links": [{ "label": "…", "url": "…" }] }

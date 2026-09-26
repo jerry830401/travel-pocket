@@ -8,8 +8,7 @@
             "轉蛋",
             "家電"
         ],
-        "businessHours": "10:00 - 20:00",
-        "googleMapLink": "https://maps.app.goo.gl/ja29CVcAgqgzhpDc7"
+        "businessHours": "10:00 - 20:00"
     },
     {
         "id": "s2",
@@ -18,8 +17,7 @@
         "tags": [
             "飲食"
         ],
-        "businessHours": "11:00 - 22:00",
-        "googleMapLink": "https://maps.app.goo.gl/RoirNhXJFcn2K5jf7"
+        "businessHours": "11:00 - 22:00"
     },
     {
         "id": "s3",
@@ -28,8 +26,7 @@
         "tags": [
             "飲食"
         ],
-        "businessHours": "10:30 - 20:30",
-        "googleMapLink": "https://maps.app.goo.gl/B9f25unzRU6kUHoH7"
+        "businessHours": "10:30 - 20:30"
     },
     {
         "id": "s4",
@@ -38,7 +35,6 @@
         "tags": [
             "衣服"
         ],
-        "businessHours": "10:00 - 20:00",
-        "googleMapLink": "https://maps.app.goo.gl/grkab6aSCFc7crTz7"
+        "businessHours": "10:00 - 20:00"
     }
 ]

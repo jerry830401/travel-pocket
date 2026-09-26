@@ -11,7 +11,6 @@
         "category": "planeTakeoff",
         "startTime": "11:30",
         "endTime": "13:20",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -21,7 +20,6 @@
         "category": "planeLanding",
         "startTime": "17:05",
         "endTime": "17:35",
-        "googleMapLink": "https://maps.app.goo.gl/cQD5bvL4yjQLYaTE8",
         "description": [
           "搭乘\"4號月台巴士\"前往博多車站"
         ]
@@ -33,7 +31,6 @@
         "category": "train",
         "startTime": "18:00",
         "endTime": "18:30",
-        "googleMapLink": "https://maps.app.goo.gl/abv5eNrjYLvriULZA",
         "description": [
           "換取 JR Pass",
           "搭乘\"九州新幹線\"前往熊本車站"
@@ -46,7 +43,6 @@
         "category": "train",
         "startTime": "19:30",
         "endTime": "19:45",
-        "googleMapLink": "https://maps.app.goo.gl/HYNhS1YpH5sK9KkLA",
         "description": ""
       },
       {
@@ -56,7 +52,6 @@
         "category": "hotel",
         "startTime": "20:00",
         "endTime": "",
-        "googleMapLink": "https://maps.app.goo.gl/fw26kJRcGHpPRfYW6",
         "description": ""
       }
     ]
@@ -73,7 +68,6 @@
         "category": "train",
         "startTime": "10:20",
         "endTime": "10:32",
-        "googleMapLink": "",
         "description": [
           "搭乘\"翡翠 or 山翡翠\"號"
         ]
@@ -85,7 +79,6 @@
         "category": "train",
         "startTime": "12:03",
         "endTime": "12:10",
-        "googleMapLink": "",
         "description": [
           "搭乘\"阿蘇火山口線\""
         ]
@@ -97,7 +90,6 @@
         "category": "sightseeing",
         "startTime": "12:46",
         "endTime": "13:58",
-        "googleMapLink": "https://maps.app.goo.gl/3ooZCUY1zuUQvJDe9",
         "description": ""
       },
       {
@@ -107,7 +99,6 @@
         "category": "sightseeing",
         "startTime": "14:10",
         "endTime": "15:10",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -117,7 +108,6 @@
         "category": "train",
         "startTime": "15:50",
         "endTime": "16:41",
-        "googleMapLink": "",
         "description": [
           "搭乘JR豐肥本線 -> 肥後大津站"
         ]
@@ -129,7 +119,6 @@
         "category": "train",
         "startTime": "17:27",
         "endTime": "17:31",
-        "googleMapLink": "https://maps.app.goo.gl/rAtgi4TZ6Dtiuh5w5",
         "description": [
           "搭乘對面的JR豐肥本線 -> 博多車站"
         ]
@@ -141,7 +130,6 @@
         "category": "train",
         "startTime": "18:20",
         "endTime": "",
-        "googleMapLink": "",
         "description": ""
       }
     ]
@@ -158,7 +146,6 @@
         "category": "sightseeing",
         "startTime": "10:00",
         "endTime": "11:00",
-        "googleMapLink": "https://maps.app.goo.gl/DdiR9Du4HVEZZR7H9",
         "description": "1. 熊本車站搭乘熊本市電到熊本城"
       },
       {
@@ -167,8 +154,7 @@
         "location": "櫻之馬場-城彩苑",
         "category": "sightseeing",
         "startTime": "11:00",
-        "endTime": "12:00",
-        "googleMapLink": "https://maps.app.goo.gl/4gmLeeu1oYVXGPYm7"
+        "endTime": "12:00"
       }
     ]
   }

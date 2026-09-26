@@ -11,7 +11,6 @@
         "category": "planeTakeoff",
         "startTime": "10:30",
         "endTime": "13:25",
-        "googleMapLink": "",
         "description": [
           "11:00 ~ 12:45 受理報到"
         ]
@@ -23,7 +22,6 @@
         "category": "planeLanding",
         "startTime": "17:55",
         "endTime": "18:30",
-        "googleMapLink": "",
         "description": [
           "搭乘\"仙台機場聯通捷運線\""
         ]
@@ -35,7 +33,6 @@
         "category": "train",
         "startTime": "19:00",
         "endTime": "19:30",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -45,7 +42,6 @@
         "category": "hotel",
         "startTime": "20:00",
         "endTime": "",
-        "googleMapLink": "",
         "description": ""
       }
     ]
@@ -62,7 +58,6 @@
         "category": "hotel",
         "startTime": "07:50",
         "endTime": "08:00",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -72,7 +67,6 @@
         "category": "sightseeing",
         "startTime": "09:00",
         "endTime": "09:30",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -82,7 +76,6 @@
         "category": "food",
         "startTime": "11:00",
         "endTime": "12:00",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -92,7 +85,6 @@
         "category": "sightseeing",
         "startTime": "12:30",
         "endTime": "15:30",
-        "googleMapLink": "https://maps.app.goo.gl/51JHDwxyxyzWZ8P27",
         "description": [
           "「藏王山麓站」->「樹冰高原站」，成人 ¥2200，小學生 ¥1100",
           "「樹冰高原站」->「地藏山頂站」，成人 ¥1200，小學生 ¥600",
@@ -106,7 +98,6 @@
         "category": "hotel",
         "startTime": "16:30",
         "endTime": "",
-        "googleMapLink": "",
         "description": ""
       }
     ]
@@ -123,7 +114,6 @@
         "category": "hotel",
         "startTime": "08:20",
         "endTime": "08:30",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -133,7 +123,6 @@
         "category": "sightseeing",
         "startTime": "10:00",
         "endTime": "",
-        "googleMapLink": "",
         "description": [
           "大人單程 ¥3000，往返 ¥4720",
           "小學生單程 ¥1500，往返 ¥2360",
@@ -147,7 +136,6 @@
         "category": "sightseeing",
         "startTime": "",
         "endTime": "11:50",
-        "googleMapLink": "https://maps.app.goo.gl/XWpwXfNvo3WwNknJ8",
         "description": ""
       },
       {
@@ -157,7 +145,6 @@
         "category": "sightseeing",
         "startTime": "13:20",
         "endTime": "16:00",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -167,7 +154,6 @@
         "category": "hotel",
         "startTime": "18:30",
         "endTime": "",
-        "googleMapLink": "",
         "description": ""
       }
     ]
@@ -184,7 +170,6 @@
         "category": "sightseeing",
         "startTime": "08:30",
         "endTime": "10:30",
-        "googleMapLink": "https://maps.app.goo.gl/rYG5spqoGpTo5rp6A",
         "description": ""
       },
       {
@@ -194,7 +179,6 @@
         "category": "sightseeing",
         "startTime": "11:00",
         "endTime": "14:00",
-        "googleMapLink": "",
         "description": [
           "搭乘「JR仙石線」至「JR中野榮站」，步行約15分鐘or搭乘接駁巴士約7分鐘",
           "成人 ¥2400，小學生 ¥1200， 4歳以上小学生以下 ¥700，4歲未滿免費"
@@ -207,7 +191,6 @@
         "category": "sightseeing",
         "startTime": "14:30",
         "endTime": "16:00",
-        "googleMapLink": "https://maps.app.goo.gl/BGMLbqrezAdi8SgA8",
         "description": [
           "啤酒工廠免費參觀，但須先網路預約"
         ]
@@ -226,7 +209,6 @@
         "category": "train",
         "startTime": "07:10",
         "endTime": "07:24",
-        "googleMapLink": "",
         "description": [
           "搭乘\"JR仙石東北線(快速) - 07:24\""
         ]
@@ -238,7 +220,6 @@
         "category": "train",
         "startTime": "08:19",
         "endTime": "08:25",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -248,7 +229,6 @@
         "category": "ship",
         "startTime": "08:50",
         "endTime": "09:00",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -258,7 +238,6 @@
         "category": "ship",
         "startTime": "09:40",
         "endTime": "",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -268,7 +247,6 @@
         "category": "ship",
         "startTime": "",
         "endTime": "15:30",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -278,7 +256,6 @@
         "category": "ship",
         "startTime": "16:30",
         "endTime": "",
-        "googleMapLink": "",
         "description": ""
       }
     ]
@@ -295,7 +272,6 @@
         "category": "sightseeing",
         "startTime": "09:00",
         "endTime": "",
-        "googleMapLink": "",
         "description": ""
       }
     ]
@@ -312,7 +288,6 @@
         "category": "train",
         "startTime": "08:45",
         "endTime": "09:00",
-        "googleMapLink": "",
         "description": [
           "搭乘\"仙台地下鐵東西線(往八木動物公園)\""
         ]
@@ -324,7 +299,6 @@
         "category": "sightseeing",
         "startTime": "09:30",
         "endTime": "14:00",
-        "googleMapLink": "",
         "description": ""
       }
     ]
@@ -341,7 +315,6 @@
         "category": "sightseeing",
         "startTime": "10:00",
         "endTime": "",
-        "googleMapLink": "",
         "description": []
       }
     ]
@@ -358,7 +331,6 @@
         "category": "train",
         "startTime": "15:00",
         "endTime": "15:30",
-        "googleMapLink": "",
         "description": ""
       },
       {
@@ -368,7 +340,6 @@
         "category": "planeTakeoff",
         "startTime": "16:00",
         "endTime": "18:50",
-        "googleMapLink": "",
         "description": [
           "16:20 ~ 18:05 受理報到"
         ]
@@ -380,7 +351,6 @@
         "category": "planeLanding",
         "startTime": "22:30",
         "endTime": "",
-        "googleMapLink": "",
         "description": ""
       }
     ]

@@ -34,7 +34,6 @@ const itinerary: ItineraryDay[] = [
         category: "transport",
         startTime: "08:00",
         endTime: "10:00",
-        googleMapLink: "https://maps.example/1",
         description: "報到",
       },
       {
@@ -45,7 +44,6 @@ const itinerary: ItineraryDay[] = [
         startTime: "12:00",
         endTime: "13:00",
         description: ["牛舌", "毛豆奶昔"],
-        thumbnail: "https://example.com/thumb.jpg",
       },
     ],
   },
@@ -59,7 +57,6 @@ const shops: Shop[] = [
     location: "一番町",
     tags: ["百貨", "伴手禮"],
     businessHours: "10:00-19:00",
-    googleMapLink: "https://maps.example/shop-2",
   },
   {
     id: "shop-1",
@@ -67,7 +64,6 @@ const shops: Shop[] = [
     location: "仙台車站",
     tags: [],
     businessHours: "09:00-20:00",
-    googleMapLink: "https://maps.example/shop-1",
   },
 ];
 
@@ -344,6 +340,24 @@ describe("/trips/:tripId/:type", () => {
     await seedTrips();
     await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
     await api("/trips/kyushu-2024/shops", { method: "PUT", body: [shops[0]], as: ALICE });
+    expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
+  });
+
+  it("drops the map links and thumbnails that older clients still send", async () => {
+    await seedTrips();
+    const oldItinerary = itinerary.map((day) => ({
+      ...day,
+      items: day.items.map((item) => ({
+        ...item,
+        googleMapLink: "https://maps.example/1",
+        thumbnail: "https://example.com/thumb.jpg",
+      })),
+    }));
+    const oldShops = shops.map((shop) => ({ ...shop, googleMapLink: "https://maps.example/shop" }));
+    const putItinerary = await api("/trips/sendai-2026/itinerary", { method: "PUT", body: oldItinerary, as: ALICE });
+    expect(putItinerary.status).toBe(200);
+    expect((await api("/trips/sendai-2026/shops", { method: "PUT", body: oldShops, as: ALICE })).status).toBe(200);
+    expect(await json(api("/trips/sendai-2026/itinerary", { as: ALICE }))).toStrictEqual(itinerary);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
   });
 
