@@ -8,8 +8,6 @@ export interface Trip {
    * a static path, or "" for none.
    */
   coverImage: string;
-  /** @deprecated Merged into `coverImage`; the API no longer stores it. */
-  snapshot?: string;
 }
 
 export interface ItineraryItem {
