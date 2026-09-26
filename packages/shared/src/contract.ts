@@ -21,3 +21,17 @@ export interface Me {
 
 /** `POST /api/trips` body: a new trip. The server assigns its `id`. */
 export type NewTrip = Omit<Trip, "id">;
+
+/** Largest cover image `PUT /api/trips/:tripId/cover` accepts, in bytes. */
+export const MAX_COVER_BYTES = 1_000_000;
+
+/** Image formats a cover can be stored in (recognized by content, not by header). */
+export const COVER_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+/**
+ * `PUT /api/trips/:tripId/cover` response. The body of the request is the
+ * image itself; the server stores it and points the trip's `coverImage` at it.
+ */
+export interface CoverUpload {
+  coverImage: string;
+}

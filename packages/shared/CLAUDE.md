@@ -5,7 +5,7 @@ Guidance for `@travel-pocket/shared`, the data types and API contract shared by 
 ## Contents
 
 - [src/types.ts](src/types.ts) — all data interfaces (`Trip`, `ItineraryDay`, `ItineraryItem`, `Shop`, `InfoItem`, …)
-- [src/contract.ts](src/contract.ts) — API contract: `TripDataMap`, `DataType`, `DATA_TYPES`, `ID_PATTERN`, and the request/response shapes `Me` (`GET /api/me`) and `NewTrip` (`POST /api/trips`)
+- [src/contract.ts](src/contract.ts) — API contract: `TripDataMap`, `DataType`, `DATA_TYPES`, `ID_PATTERN`, the cover limits `MAX_COVER_BYTES` and `COVER_CONTENT_TYPES`, and the request/response shapes `Me` (`GET /api/me`), `NewTrip` (`POST /api/trips`) and `CoverUpload` (`PUT /api/trips/:tripId/cover`)
 - [src/index.ts](src/index.ts) — the package entry, re-exporting both
 
 ## Conventions

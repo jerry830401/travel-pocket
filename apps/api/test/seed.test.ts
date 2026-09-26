@@ -15,7 +15,6 @@ const trips: Trip[] = [
     startDate: "2026-03-01",
     endDate: "2026-03-08",
     coverImage: "https://example.com/sendai.jpg",
-    snapshot: "data/sendai-2026/snapshot.jpg",
   },
   {
     id: "kyushu-2024",
@@ -88,6 +87,13 @@ describe("toSqlText", () => {
   it("inlines parameters as literals on one line", () => {
     const statement = { sql: "SELECT ?1,\n  ?2, ?3,\n?1", params: ["it's", null, 42] };
     expect(toSqlText(statement)).toBe("SELECT 'it''s', NULL, 42, 'it''s';");
+  });
+
+  it("inlines bytes as a BLOB literal", async () => {
+    const bytes = new Uint8Array([0x00, 0x0f, 0xff]).buffer;
+    const sql = toSqlText({ sql: "SELECT hex(?1) AS h", params: [bytes] });
+    expect(sql).toBe("SELECT hex(X'000fff') AS h;");
+    expect(await env.DB.prepare(sql.slice(0, -1)).first("h")).toBe("000FFF");
   });
 
   it("refuses a statement with a missing parameter", () => {

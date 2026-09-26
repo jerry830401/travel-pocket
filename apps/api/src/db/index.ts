@@ -14,6 +14,7 @@ export {
   upsertTrips,
 } from "./trips";
 export { ensureUser } from "./users";
+export { getCover, saveCover } from "./covers";
 
 export function getTripData(
   db: D1Database,
