@@ -6,18 +6,22 @@ import Home from "./Home";
 import { ToastProvider } from "../contexts/ToastContext";
 import * as dataSource from "../dataSource";
 import * as resize from "../resizeImage";
-import type { Trip } from "../types";
+import type { TripEntry } from "../types";
 
 // Home against a signed-in API: the data layer is mocked at its module
 // boundary (the static-mode behavior is covered by Home.test.tsx).
-vi.mock("../dataSource", () => ({
-  apiEnabled: true,
-  loadTrips: vi.fn(),
-  saveTrips: vi.fn(),
-  createTrip: vi.fn(),
-  deleteTrip: vi.fn(),
-  uploadCover: vi.fn(),
-}));
+vi.mock("../dataSource", async (importOriginal) => {
+  const { ConflictError } = await importOriginal<typeof import("../dataSource")>();
+  return {
+    apiEnabled: true,
+    ConflictError,
+    loadTrips: vi.fn(),
+    updateTrip: vi.fn(),
+    createTrip: vi.fn(),
+    deleteTrip: vi.fn(),
+    uploadCover: vi.fn(),
+  };
+});
 
 // jsdom has no canvas, so picking a photo skips the real resizing.
 vi.mock("../resizeImage", () => ({ resizeImage: vi.fn() }));
@@ -34,23 +38,36 @@ vi.mock("framer-motion", () => ({
 const ds = vi.mocked(dataSource);
 const resizeImage = vi.mocked(resize.resizeImage);
 
-const tokyo: Trip = {
+const tokyo: TripEntry = {
   id: "trip-tokyo",
   name: "東京春遊",
   startDate: "2024-03-10",
   endDate: "2024-03-16",
   coverImage: "/cover1.jpg",
+  version: 2,
 };
 
-const sendai: Trip = {
+const sendai: TripEntry = {
   id: "trip-sendai",
   name: "仙台夏祭",
   startDate: "2024-08-05",
   endDate: "2024-08-10",
   coverImage: "/cover2.jpg",
+  version: 0,
 };
 
-const kyoto: Trip = { id: "srv-1", name: "京都", startDate: "2026-11-01", endDate: "2026-11-03", coverImage: "" };
+const kyoto: TripEntry = {
+  id: "srv-1",
+  name: "京都",
+  startDate: "2026-11-01",
+  endDate: "2026-11-03",
+  coverImage: "",
+  version: 0,
+};
+
+/** A trip's fields, as updateTrip sends them. */
+const fieldsOf = ({ name, startDate, endDate, coverImage }: TripEntry) =>
+  ({ name, startDate, endDate, coverImage });
 
 const photo = new File(["photo"], "photo.jpg", { type: "image/jpeg" });
 const resized = new Blob(["small"], { type: "image/jpeg" });
@@ -112,11 +129,15 @@ function coverOf(name: string): HTMLImageElement | null {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  ds.loadTrips.mockResolvedValue({ data: [tokyo, sendai], editable: true });
-  ds.saveTrips.mockResolvedValue(undefined);
+  ds.loadTrips.mockResolvedValue({ data: [tokyo, sendai], editable: true, version: null });
+  ds.updateTrip.mockImplementation(async (id, fields, version) => ({ id, ...fields, version: version + 1 }));
   ds.createTrip.mockResolvedValue(kyoto);
   ds.deleteTrip.mockResolvedValue(undefined);
-  ds.uploadCover.mockImplementation(async (tripId) => uploadedUrl(tripId));
+  // Nobody else saves in between: the upload bumps the version the trip was read at.
+  ds.uploadCover.mockImplementation(async (tripId) => ({
+    coverImage: uploadedUrl(tripId),
+    version: (tripId === tokyo.id ? tokyo.version : 0) + 1,
+  }));
   resizeImage.mockResolvedValue(resized);
   let blobs = 0;
   Object.assign(URL, {
@@ -166,7 +187,7 @@ describe("編輯模式", () => {
     expect(screen.queryByTitle("編輯")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "新增旅程" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "編輯" })).toBeInTheDocument();
-    expect(ds.saveTrips).not.toHaveBeenCalled();
+    expect(ds.updateTrip).not.toHaveBeenCalled();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
@@ -184,7 +205,7 @@ describe("編輯模式", () => {
 
 describe("沒有旅程", () => {
   it("顯示空白畫面與新增按鈕", async () => {
-    ds.loadTrips.mockResolvedValue({ data: [], editable: true });
+    ds.loadTrips.mockResolvedValue({ data: [], editable: true, version: null });
     renderHome();
     expect(await screen.findByText("還沒有旅行筆記")).toBeInTheDocument();
     await startEditing();
@@ -228,27 +249,50 @@ describe("新增旅程", () => {
   });
 });
 
+/** Renames 東京春遊 to 東京秋遊 in the draft. */
+async function renameTokyo() {
+  await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
+  await userEvent.clear(field("旅行名稱"));
+  await userEvent.type(field("旅行名稱"), "東京秋遊");
+  await userEvent.click(screen.getByRole("button", { name: "確定" }));
+}
+
 describe("修改旅程", () => {
-  it("完成時以整份清單更新", async () => {
+  it("完成時只更新改過的旅程，帶著讀到的版本", async () => {
     renderHome();
 
     await startEditing();
-    await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
-    await userEvent.clear(field("旅行名稱"));
-    await userEvent.type(field("旅行名稱"), "東京秋遊");
-    await userEvent.click(screen.getByRole("button", { name: "確定" }));
-    expect(ds.saveTrips).not.toHaveBeenCalled();
+    await renameTokyo();
+    expect(ds.updateTrip).not.toHaveBeenCalled();
 
     await finish();
-    expect(ds.saveTrips).toHaveBeenCalledWith([
-      expect.objectContaining({ id: "trip-tokyo", name: "東京秋遊" }),
-      sendai,
-    ]);
+    expect(ds.updateTrip).toHaveBeenCalledOnce();
+    expect(ds.updateTrip).toHaveBeenCalledWith("trip-tokyo", { ...fieldsOf(tokyo), name: "東京秋遊" }, 2);
     expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
   });
 
+  it("別人先改過時提示、離開編輯模式並載入最新的清單", async () => {
+    ds.updateTrip.mockRejectedValueOnce(new dataSource.ConflictError());
+    renderHome();
+
+    await startEditing();
+    await renameTokyo();
+    ds.loadTrips.mockResolvedValue({
+      data: [{ ...tokyo, name: "東京（別人改的）", version: 3 }, sendai],
+      editable: true,
+      version: null,
+    });
+    await finish();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("別人剛修改過，已載入最新版本");
+    expect(await screen.findByText("東京（別人改的）")).toBeInTheDocument();
+    expect(screen.queryByText("東京秋遊")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "編輯" })).toBeInTheDocument();
+    expect(ds.loadTrips).toHaveBeenCalledTimes(2);
+  });
+
   it("新增後更新失敗，重試時不重複建立", async () => {
-    ds.saveTrips.mockRejectedValueOnce(new Error("HTTP 500"));
+    ds.updateTrip.mockRejectedValueOnce(new Error("HTTP 500"));
     renderHome();
 
     await startEditing();
@@ -263,13 +307,13 @@ describe("修改旅程", () => {
     expect(screen.getByRole("button", { name: "完成" })).toBeInTheDocument();
 
     await finish();
-    await waitFor(() => expect(ds.saveTrips).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(ds.updateTrip).toHaveBeenCalledTimes(2));
     expect(ds.createTrip).toHaveBeenCalledOnce();
-    expect(ds.saveTrips).toHaveBeenLastCalledWith([
-      expect.objectContaining({ id: "trip-tokyo", name: "東京秋遊" }),
-      sendai,
-      kyoto,
-    ]);
+    expect(ds.updateTrip).toHaveBeenLastCalledWith(
+      "trip-tokyo",
+      { ...fieldsOf(tokyo), name: "東京秋遊" },
+      2
+    );
   });
 });
 
@@ -289,7 +333,7 @@ describe("刪除旅程", () => {
     await finish();
     expect(ds.deleteTrip).toHaveBeenCalledWith("trip-tokyo");
     expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
-    expect(ds.saveTrips).not.toHaveBeenCalled();
+    expect(ds.updateTrip).not.toHaveBeenCalled();
   });
 
   it("確認時選取消就不刪除", async () => {
@@ -325,7 +369,7 @@ describe("刪除旅程", () => {
 
 describe("無法編輯的資料", () => {
   it("顯示唯讀提示，且沒有編輯開關與編輯、刪除、新增按鈕", async () => {
-    ds.loadTrips.mockResolvedValue({ data: [tokyo], editable: false });
+    ds.loadTrips.mockResolvedValue({ data: [tokyo], editable: false, version: null });
     renderHome();
 
     expect(await screen.findByRole("status")).toHaveTextContent("暫時無法編輯");
@@ -351,7 +395,7 @@ describe("封面圖", () => {
     await finish();
     expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
     expect(ds.uploadCover).toHaveBeenCalledWith("trip-tokyo", resized);
-    expect(ds.saveTrips).not.toHaveBeenCalled();
+    expect(ds.updateTrip).not.toHaveBeenCalled();
     expect(coverOf("東京春遊")).toHaveAttribute("src", uploadedUrl("trip-tokyo"));
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:cover-1");
   });
@@ -366,7 +410,7 @@ describe("封面圖", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
     expect(ds.createTrip).toHaveBeenCalledWith(expect.objectContaining({ name: "京都", coverImage: "" }));
     expect(ds.uploadCover).toHaveBeenCalledWith("srv-1", resized);
-    expect(ds.saveTrips).not.toHaveBeenCalled();
+    expect(ds.updateTrip).not.toHaveBeenCalled();
     expect(coverOf("京都")).toHaveAttribute("src", uploadedUrl("srv-1"));
   });
 
@@ -398,8 +442,43 @@ describe("封面圖", () => {
     expect(coverOf("東京春遊")).toBeNull();
 
     await finish();
-    expect(ds.saveTrips).toHaveBeenCalledWith([{ ...tokyo, coverImage: "" }, sendai]);
+    expect(ds.updateTrip).toHaveBeenCalledWith("trip-tokyo", { ...fieldsOf(tokyo), coverImage: "" }, 2);
     expect(ds.uploadCover).not.toHaveBeenCalled();
+  });
+
+  it("換封面又改名時，改名用上傳後的版本", async () => {
+    renderHome();
+
+    await startEditing();
+    await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
+    await pickCover();
+    await userEvent.clear(field("旅行名稱"));
+    await userEvent.type(field("旅行名稱"), "東京秋遊");
+    await userEvent.click(screen.getByRole("button", { name: "確定" }));
+    await finish();
+
+    expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
+    expect(ds.updateTrip).toHaveBeenCalledWith(
+      "trip-tokyo",
+      { ...fieldsOf(tokyo), name: "東京秋遊", coverImage: uploadedUrl("trip-tokyo") },
+      3
+    );
+  });
+
+  it("上傳封面時別人也改過，改名仍用讀到的版本，交給 API 拒絕", async () => {
+    ds.uploadCover.mockResolvedValueOnce({ coverImage: uploadedUrl("trip-tokyo"), version: 5 });
+    renderHome();
+
+    await startEditing();
+    await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
+    await pickCover();
+    await userEvent.clear(field("旅行名稱"));
+    await userEvent.type(field("旅行名稱"), "東京秋遊");
+    await userEvent.click(screen.getByRole("button", { name: "確定" }));
+    await finish();
+
+    await waitFor(() => expect(ds.updateTrip).toHaveBeenCalledOnce());
+    expect(ds.updateTrip).toHaveBeenCalledWith("trip-tokyo", expect.anything(), 2);
   });
 
   it("讀不了的圖片會提示，封面維持原樣", async () => {

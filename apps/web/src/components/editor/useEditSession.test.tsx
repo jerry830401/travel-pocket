@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, renderHook, screen } from "@testing-library/react";
 import { ToastProvider } from "../../contexts/ToastContext";
-import { useEditSession, type SaveDraft } from "./useEditSession";
+import { ConflictError } from "../../dataSource";
+import { useEditSession, type EditSessionOptions, type SaveDraft } from "./useEditSession";
 
 vi.mock("framer-motion", () => ({
   motion: {
@@ -12,8 +13,8 @@ vi.mock("framer-motion", () => ({
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-function setup(save: SaveDraft<string[]>, lockNav?: (locked: boolean) => void) {
-  const hook = renderHook(() => useEditSession<string[]>([], save, lockNav), {
+function setup(save: SaveDraft<string[]>, options?: EditSessionOptions) {
+  const hook = renderHook(() => useEditSession<string[]>([], save, options), {
     wrapper: ToastProvider,
   });
   act(() => hook.result.current.load(["a", "b"]));
@@ -82,6 +83,35 @@ describe("useEditSession", () => {
     expect(result.current.editing).toBe(false);
   });
 
+  it("別人先存過時丟掉草稿、離開編輯模式並重新載入", async () => {
+    const save = vi.fn<SaveDraft<string[]>>(async () => { throw new ConflictError(); });
+    const reload = vi.fn();
+    const { result } = setup(save, { reload });
+
+    act(() => result.current.start());
+    act(() => result.current.setData(["a"]));
+    await act(() => result.current.finish());
+
+    expect(screen.getByRole("alert")).toHaveTextContent("別人剛修改過，已載入最新版本");
+    expect(result.current.editing).toBe(false);
+    expect(result.current.data).toEqual(["a", "b"]);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it("衝突前已存好的進度不會被丟掉", async () => {
+    const save = vi.fn<SaveDraft<string[]>>(async (_draft, _saved, progress) => {
+      progress(["a"], ["a", "c"]);
+      throw new ConflictError();
+    });
+    const { result } = setup(save, { reload: vi.fn() });
+
+    act(() => result.current.start());
+    act(() => result.current.setData(["a", "c"]));
+    await act(() => result.current.finish());
+
+    expect(result.current.data).toEqual(["a"]);
+  });
+
   it("取消時確認後丟棄草稿", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const { result } = setup(vi.fn());
@@ -120,7 +150,7 @@ describe("useEditSession", () => {
 
   it("編輯中鎖住導覽，結束後解鎖", () => {
     const lockNav = vi.fn();
-    const { result } = setup(vi.fn(), lockNav);
+    const { result } = setup(vi.fn(), { lockNav });
 
     act(() => result.current.start());
     expect(lockNav).toHaveBeenLastCalledWith(true);

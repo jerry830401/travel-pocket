@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { NewTrip, Trip } from "../types";
-import { apiEnabled, createTrip, deleteTrip, loadTrips, saveTrips, uploadCover } from "../dataSource";
+import type { NewTrip, Trip, TripEntry } from "../types";
+import { apiEnabled, createTrip, deleteTrip, loadTrips, updateTrip, uploadCover } from "../dataSource";
 import { resizeImage } from "../resizeImage";
 import { EditModal, FieldInput, FieldImage, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
 import { lockedLink } from "../components/lockedLink";
@@ -62,13 +62,17 @@ const isPendingCover = (coverImage: string) => coverImage.startsWith("blob:");
    never appears in a real id (ID_PATTERN). */
 const NEW_ID = "new:";
 
+const sameFields = (a: Trip, b: Trip) =>
+  a.name === b.name && a.startDate === b.startDate && a.endDate === b.endDate &&
+  a.coverImage === b.coverImage;
+
 /**
  * Saves the trip list in the order the API needs: deletions first, then new
  * trips (the server assigns their ids), then the picked covers, then one PUT
- * for edits and order. Each step is reported, so a retry after a failure
- * skips what went through.
+ * per edited trip, over the version it was read at. Each step is reported, so
+ * a retry after a failure skips what went through.
  */
-function makeSaveTripList(pendingCovers: Map<string, Blob>): SaveDraft<Trip[]> {
+function makeSaveTripList(pendingCovers: Map<string, Blob>): SaveDraft<TripEntry[]> {
   return async (draft, saved, progress) => {
     let s = saved;
     let d = draft;
@@ -89,29 +93,44 @@ function makeSaveTripList(pendingCovers: Map<string, Blob>): SaveDraft<Trip[]> {
     for (const trip of d.filter((t) => isPendingCover(t.coverImage))) {
       const image = pendingCovers.get(trip.coverImage);
       if (!image) throw new Error("找不到選取的封面圖");
-      // The API points the saved trip at the new cover by itself.
-      const coverImage = await uploadCover(trip.id, image);
-      s = s.map((t) => (t.id === trip.id ? { ...t, coverImage } : t));
-      d = d.map((t) => (t.id === trip.id ? { ...t, coverImage } : t));
+      // The API points the saved trip at the new cover by itself, and bumps its
+      // version. The draft moves on to that version only if nobody else saved
+      // the trip in the meantime; otherwise its other edits are refused below.
+      const { coverImage, version } = await uploadCover(trip.id, image);
+      s = s.map((t) => (t.id === trip.id ? { ...t, coverImage, version } : t));
+      d = d.map((t) =>
+        t.id === trip.id
+          ? { ...t, coverImage, version: version === t.version + 1 ? version : t.version }
+          : t
+      );
       progress(s, d);
     }
-    if (JSON.stringify(s) !== JSON.stringify(d)) await saveTrips(d);
+    for (const trip of d) {
+      const before = s.find((t) => t.id === trip.id);
+      if (!before || sameFields(before, trip)) continue;
+      const updated = await updateTrip(trip.id, draftToNewTrip(tripToDraft(trip)), trip.version);
+      s = s.map((t) => (t.id === trip.id ? updated : t));
+      d = d.map((t) => (t.id === trip.id ? updated : t));
+      progress(s, d);
+    }
     return d;
   };
 }
 
 const Home = () => {
   const [pendingCovers] = useState(() => new Map<string, Blob>());
-  const session = useEditSession<Trip[]>([], makeSaveTripList(pendingCovers));
+  const [retry, setRetry] = useState(0);
+  const session = useEditSession<TripEntry[]>([], makeSaveTripList(pendingCovers), {
+    reload: () => setRetry((r) => r + 1),
+  });
   const { data: trips, setData: setTrips, load, editing } = session;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [retry, setRetry] = useState(0);
   const [editable, setEditable] = useState(false);
   const canEdit = editable && editing && !session.saving;
 
   /* Edit state */
-  const [editTarget, setEditTarget] = useState<Trip | null>(null);
+  const [editTarget, setEditTarget] = useState<TripEntry | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<TripDraft>(EMPTY_DRAFT);
   const [preparingCover, setPreparingCover] = useState(false);
@@ -129,7 +148,7 @@ const Home = () => {
       .catch(() => { setError(true); setLoading(false); });
   }, [retry]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const openEdit = (trip: Trip, e: React.MouseEvent) => {
+  const openEdit = (trip: TripEntry, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDraft(tripToDraft(trip));
@@ -167,18 +186,15 @@ const Home = () => {
       return;
     }
     if (adding) {
-      setTrips([...trips, { ...draftToNewTrip(draft), id: `${NEW_ID}${Date.now()}` }]);
+      setTrips([...trips, { ...draftToNewTrip(draft), id: `${NEW_ID}${Date.now()}`, version: 0 }]);
     } else if (editTarget) {
-      setTrips(trips.map((t) =>
-        // Same key order as the API's trips, so an unchanged trip compares equal.
-        t.id === editTarget.id ? { id: t.id, ...draftToNewTrip(draft) } : t
-      ));
+      setTrips(trips.map((t) => (t.id === editTarget.id ? { ...t, ...draftToNewTrip(draft) } : t)));
     }
     closeModal();
   };
 
   // The API deletes the trip (with its itinerary, shops and info) on 完成.
-  const handleDelete = (trip: Trip, e: React.MouseEvent) => {
+  const handleDelete = (trip: TripEntry, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!confirm(`確定要刪除「${trip.name}」？行程、店家和資訊會一起刪除。`)) return;

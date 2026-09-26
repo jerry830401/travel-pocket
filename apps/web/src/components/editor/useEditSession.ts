@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useToast } from "../../contexts/ToastContext";
+import { ConflictError } from "../../dataSource";
 
 /**
  * Writes a draft to the API and resolves with what is now saved. A save made
@@ -12,16 +13,26 @@ export type SaveDraft<T> = (
   progress: (saved: T, draft: T) => void
 ) => Promise<T>;
 
+export interface EditSessionOptions {
+  /**
+   * Called with true while editing and false afterwards, so the page around
+   * can stop navigation that would lose the draft.
+   */
+  lockNav?: (locked: boolean) => void;
+  /** Loads the page's data again; called when a save finds it changed since it was read. */
+  reload?: () => void;
+}
+
 /**
  * Draft editing for a page: in edit mode every change stays on screen until
- * `finish` saves it (with a toast either way) or `cancel` drops it.
- * `lockNav` is called with true while editing and false afterwards, so the
- * page around can stop navigation that would lose the draft.
+ * `finish` saves it (with a toast either way) or `cancel` drops it. When the
+ * save is refused because someone else saved first (`ConflictError`), the
+ * draft is dropped and the page reloads, instead of overwriting their change.
  */
 export function useEditSession<T>(
   initial: T,
   save: SaveDraft<T>,
-  lockNav?: (locked: boolean) => void
+  { lockNav, reload }: EditSessionOptions = {}
 ) {
   const [saved, setSaved] = useState<T>(initial);
   const [draft, setDraft] = useState<T>(initial);
@@ -53,8 +64,10 @@ export function useEditSession<T>(
       return;
     }
     setSaving(true);
+    let current = saved;
     try {
       const next = await save(draft, saved, (s, d) => {
+        current = s;
         setSaved(s);
         setDraft(d);
       });
@@ -62,7 +75,14 @@ export function useEditSession<T>(
       setEditing(false);
       showToast("已儲存");
     } catch (err) {
-      showToast(`儲存失敗：${err instanceof Error ? err.message : err}`, "error");
+      if (err instanceof ConflictError) {
+        setDraft(current);
+        setEditing(false);
+        showToast("別人剛修改過，已載入最新版本", "error");
+        reload?.();
+      } else {
+        showToast(`儲存失敗：${err instanceof Error ? err.message : err}`, "error");
+      }
     } finally {
       setSaving(false);
     }

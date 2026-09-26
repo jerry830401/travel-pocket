@@ -117,13 +117,16 @@ function nextDateStr(dateStr: string): string {
 
 const Schedule = () => {
   const { trip, editSlot, actionSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const [retry, setRetry] = useState(0);
+  // The version the itinerary was read at, which a save must name.
+  const version = useRef(0);
   const session = useEditSession<ItineraryDay[]>(
     [],
     async (next) => {
-      await saveTripData(trip.id, "itinerary", next);
+      version.current = await saveTripData(trip.id, "itinerary", next, version.current);
       return next;
     },
-    setNavLocked
+    { lockNav: setNavLocked, reload: () => setRetry((r) => r + 1) }
   );
   const { data: days, setData: setDays, load } = session;
   const [selectedDayIdx, setDayIdx] = useState(0);
@@ -135,7 +138,6 @@ const Schedule = () => {
   const [editable, setEditable] = useState(false);
   const canEdit = editable && session.editing && !session.saving;
   const [error, setError] = useState(false);
-  const [retry, setRetry] = useState(0);
   const dayBarRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -153,7 +155,8 @@ const Schedule = () => {
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "itinerary")
-      .then(({ data, editable }) => {
+      .then(({ data, editable, version: read }) => {
+        version.current = read ?? 0;
         load(data);
         setEditable(editable);
         const ti = data.findIndex((d) => d.date === today);

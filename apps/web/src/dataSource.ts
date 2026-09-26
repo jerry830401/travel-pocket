@@ -1,4 +1,13 @@
-import type { CoverUpload, DataType, Me, NewTrip, Trip, TripDataMap } from "./types";
+import { parseVersionTag, versionTag } from "@travel-pocket/shared";
+import type {
+  CoverUpload,
+  DataType,
+  Me,
+  NewTrip,
+  TripDataMap,
+  TripEntry,
+  TripUpdate,
+} from "./types";
 
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, "");
 
@@ -18,11 +27,14 @@ const API_CACHE = "trip-api";
 /**
  * `editable` is true only for data read live from the API. `PUT` replaces a
  * whole list, so saving edits made on the static fallback or on a cached copy
- * could overwrite newer data in the database.
+ * could overwrite newer data in the database. `version` is what the API
+ * answered in `ETag` (a trip's list), and what a save of the data must name;
+ * null when there is none (the trip list, the static JSON).
  */
 export interface Loaded<T> {
   data: T;
   editable: boolean;
+  version: number | null;
 }
 
 /** The API call found no signed-in user. */
@@ -30,6 +42,14 @@ export class SignInRequiredError extends Error {
   constructor() {
     super("請先登入");
     this.name = "SignInRequiredError";
+  }
+}
+
+/** The data changed since it was read (412): someone else saved first. Nothing was written. */
+export class ConflictError extends Error {
+  constructor() {
+    super("別人剛修改過");
+    this.name = "ConflictError";
   }
 }
 
@@ -72,7 +92,7 @@ async function get(url: string): Promise<Response> {
 
 async function loadStatic<T>(staticPath: string): Promise<Loaded<T>> {
   const res = await get(`${import.meta.env.BASE_URL}data/${staticPath}`);
-  return { data: (await res.json()) as T, editable: false };
+  return { data: (await res.json()) as T, editable: false, version: null };
 }
 
 async function load<T>(apiPath: string, staticPath: string): Promise<Loaded<T>> {
@@ -80,7 +100,11 @@ async function load<T>(apiPath: string, staticPath: string): Promise<Loaded<T>> 
   try {
     const res = await apiFetch(apiPath);
     if (!res.ok) throw new Error(`GET ${apiPath} failed: ${res.status}`);
-    return { data: (await res.json()) as T, editable: !res.headers.has(SW_CACHE_HEADER) };
+    return {
+      data: (await res.json()) as T,
+      editable: !res.headers.has(SW_CACHE_HEADER),
+      version: parseVersionTag(res.headers.get("ETag")),
+    };
   } catch (err) {
     // Only the dev server still serves the static JSON (from packages/data);
     // production builds no longer ship it. Signing in is never papered over.
@@ -89,8 +113,10 @@ async function load<T>(apiPath: string, staticPath: string): Promise<Loaded<T>> 
   }
 }
 
-export function loadTrips(): Promise<Loaded<Trip[]>> {
-  return load("/trips", "trips.json");
+export async function loadTrips(): Promise<Loaded<TripEntry[]>> {
+  const loaded = await load<TripEntry[]>("/trips", "trips.json");
+  // The static JSON has plain trips; it is never edited, so any version will do.
+  return { ...loaded, data: loaded.data.map((trip) => ({ ...trip, version: trip.version ?? 0 })) };
 }
 
 export function loadTripData<T extends DataType>(
@@ -116,6 +142,7 @@ export async function loadMe(): Promise<Me | null> {
 async function write(apiPath: string, init: RequestInit): Promise<Response> {
   if (!API_URL) throw new Error("Editing needs the API");
   const res = await apiFetch(apiPath, init);
+  if (res.status === 412) throw new ConflictError();
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error ?? `HTTP ${res.status}`);
@@ -123,44 +150,57 @@ async function write(apiPath: string, init: RequestInit): Promise<Response> {
   return res;
 }
 
-function send(method: "POST" | "PUT" | "DELETE", apiPath: string, body?: unknown) {
+/** `version`: what the data was read at, sent as `If-Match` (see `ConflictError`). */
+function send(method: "POST" | "PUT" | "DELETE", apiPath: string, body?: unknown, version?: number) {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (version !== undefined) headers["If-Match"] = versionTag(version);
   return write(apiPath, {
     method,
-    ...(body !== undefined && {
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
+    ...(Object.keys(headers).length > 0 && { headers }),
+    ...(body !== undefined && { body: JSON.stringify(body) }),
   });
 }
 
-export async function saveTrips(trips: Trip[]): Promise<void> {
-  await send("PUT", "/trips", trips);
+export async function createTrip(trip: NewTrip): Promise<TripEntry> {
+  return (await (await send("POST", "/trips", trip)).json()) as TripEntry;
 }
 
-export async function createTrip(trip: NewTrip): Promise<Trip> {
-  return (await (await send("POST", "/trips", trip)).json()) as Trip;
+/** Saves a trip's fields over `version` and resolves with the trip at its new version. */
+export async function updateTrip(
+  tripId: string,
+  fields: TripUpdate,
+  version: number
+): Promise<TripEntry> {
+  return (await (await send("PUT", `/trips/${tripId}`, fields, version)).json()) as TripEntry;
 }
 
 export async function deleteTrip(tripId: string): Promise<void> {
   await send("DELETE", `/trips/${tripId}`);
 }
 
-/** Uploads the trip's cover and resolves with the `coverImage` URL the trip now has. */
-export async function uploadCover(tripId: string, image: Blob): Promise<string> {
+/**
+ * Uploads the trip's cover and resolves with the `coverImage` URL the trip now
+ * has, and the trip's new version.
+ */
+export async function uploadCover(tripId: string, image: Blob): Promise<CoverUpload> {
   const res = await write(`/trips/${tripId}/cover`, {
     method: "PUT",
     headers: { "Content-Type": image.type },
     body: image,
   });
-  return ((await res.json()) as CoverUpload).coverImage;
+  return (await res.json()) as CoverUpload;
 }
 
+/** Replaces a trip's list over `version` and resolves with its new version. */
 export async function saveTripData<T extends DataType>(
   tripId: string,
   type: T,
-  data: TripDataMap[T]
-): Promise<void> {
-  await send("PUT", `/trips/${tripId}/${type}`, data);
+  data: TripDataMap[T],
+  version: number
+): Promise<number> {
+  const res = await send("PUT", `/trips/${tripId}/${type}`, data, version);
+  return parseVersionTag(res.headers.get("ETag")) ?? version + 1;
 }
 
 /**

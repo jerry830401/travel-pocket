@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOutletContext } from "react-router-dom";
 import type { InfoItem, InfoLink } from "../types";
@@ -26,13 +26,16 @@ type LinkDraft = { label: string; url: string };
 
 const Info = () => {
   const { trip, editSlot, actionSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const [reloads, setReloads] = useState(0);
+  // The version the info was read at, which a save must name.
+  const version = useRef(0);
   const session = useEditSession<InfoItem[]>(
     [],
     async (next) => {
-      await saveTripData(trip.id, "info", next);
+      version.current = await saveTripData(trip.id, "info", next, version.current);
       return next;
     },
-    setNavLocked
+    { lockNav: setNavLocked, reload: () => setReloads((r) => r + 1) }
   );
   const { data: items, setData: setItems, load } = session;
   const [loading, setLoading] = useState(true);
@@ -47,9 +50,14 @@ const Info = () => {
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "info")
-      .then(({ data, editable }) => { load(data); setEditable(editable); setLoading(false); })
+      .then(({ data, editable, version: read }) => {
+        version.current = read ?? 0;
+        load(data);
+        setEditable(editable);
+        setLoading(false);
+      })
       .catch(console.error);
-  }, [trip]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trip, reloads]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── InfoItem actions ── */
   const openEditItem = (item: InfoItem, e: React.MouseEvent) => {

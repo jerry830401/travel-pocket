@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOutletContext } from "react-router-dom";
 import type { Shop } from "../types";
@@ -45,13 +45,16 @@ function draftToShop(draft: ShopDraft, id: string): Shop {
 
 const Shops = () => {
   const { trip, editSlot, actionSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const [retry, setRetry] = useState(0);
+  // The version the shops were read at, which a save must name.
+  const version = useRef(0);
   const session = useEditSession<Shop[]>(
     [],
     async (next) => {
-      await saveTripData(trip.id, "shops", next);
+      version.current = await saveTripData(trip.id, "shops", next, version.current);
       return next;
     },
-    setNavLocked
+    { lockNav: setNavLocked, reload: () => setRetry((r) => r + 1) }
   );
   const { data: shops, setData: setShops, load } = session;
   const [selectedTag, setSelectedTag] = useState("All");
@@ -59,7 +62,6 @@ const Shops = () => {
   const [editable, setEditable] = useState(false);
   const canEdit = editable && session.editing && !session.saving;
   const [error, setError] = useState(false);
-  const [retry, setRetry] = useState(0);
 
   /* Edit state */
   const [editTarget, setEditTarget] = useState<Shop | null>(null);
@@ -69,7 +71,12 @@ const Shops = () => {
   useEffect(() => {
     if (!trip) return;
     loadTripData(trip.id, "shops")
-      .then(({ data, editable }) => { load(data); setEditable(editable); setLoading(false); })
+      .then(({ data, editable, version: read }) => {
+        version.current = read ?? 0;
+        load(data);
+        setEditable(editable);
+        setLoading(false);
+      })
       .catch(() => { setError(true); setLoading(false); });
   }, [trip, retry]); // eslint-disable-line react-hooks/exhaustive-deps
 

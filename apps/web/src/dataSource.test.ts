@@ -32,7 +32,11 @@ describe("靜態模式（沒有 VITE_API_URL）", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([{ id: "t1" }]));
     const ds = await importDataSource();
 
-    await expect(ds.loadTrips()).resolves.toEqual({ data: [{ id: "t1" }], editable: false });
+    await expect(ds.loadTrips()).resolves.toEqual({
+      data: [{ id: "t1", version: 0 }],
+      editable: false,
+      version: null,
+    });
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledWith(staticUrl("trips.json"));
   });
@@ -44,6 +48,7 @@ describe("靜態模式（沒有 VITE_API_URL）", () => {
     await expect(ds.loadTripData("kyushu-2024", "itinerary")).resolves.toEqual({
       data: [],
       editable: false,
+      version: null,
     });
     expect(fetchSpy).toHaveBeenCalledWith(staticUrl("kyushu-2024/itinerary.json"));
   });
@@ -67,8 +72,9 @@ describe("靜態模式（沒有 VITE_API_URL）", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const ds = await importDataSource();
 
-    await expect(ds.saveTrips([])).rejects.toThrow();
-    await expect(ds.saveTripData("kyushu-2024", "shops", [])).rejects.toThrow();
+    const fields = { name: "x", startDate: "2026-01-01", endDate: "2026-01-02", coverImage: "" };
+    await expect(ds.updateTrip("kyushu-2024", fields, 0)).rejects.toThrow();
+    await expect(ds.saveTripData("kyushu-2024", "shops", [], 0)).rejects.toThrow();
     await expect(
       ds.createTrip({ name: "x", startDate: "2026-01-01", endDate: "2026-01-02", coverImage: "" })
     ).rejects.toThrow();
@@ -87,12 +93,24 @@ describe("API 模式", () => {
   });
 
   it("從 API 讀到的資料可以編輯", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([{ id: "t1" }]));
+    const trips = [{ id: "t1", version: 3 }];
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(trips));
     const ds = await importDataSource(apiEnv);
 
-    await expect(ds.loadTrips()).resolves.toEqual({ data: [{ id: "t1" }], editable: true });
+    await expect(ds.loadTrips()).resolves.toEqual({ data: trips, editable: true, version: null });
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledWith("/api/trips", { redirect: "manual" });
+  });
+
+  it("loadTripData 帶回 ETag 裡的版本", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([], 200, { ETag: '"7"' }));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.loadTripData("kyushu-2024", "shops")).resolves.toEqual({
+      data: [],
+      editable: true,
+      version: 7,
+    });
   });
 
   it("loadTripData 從 API 讀取，並去掉 VITE_API_URL 結尾的斜線", async () => {
@@ -110,7 +128,11 @@ describe("API 模式", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(cached);
     const ds = await importDataSource(apiEnv);
 
-    await expect(ds.loadTrips()).resolves.toEqual({ data: [{ id: "t1" }], editable: false });
+    await expect(ds.loadTrips()).resolves.toEqual({
+      data: [{ id: "t1", version: 0 }],
+      editable: false,
+      version: null,
+    });
   });
 
   it("dev server 上 API 回應非 ok 時退回靜態 JSON，且不可編輯", async () => {
@@ -123,6 +145,7 @@ describe("API 模式", () => {
     await expect(ds.loadTripData("kyushu-2024", "shops")).resolves.toEqual({
       data: [{ id: "static" }],
       editable: false,
+      version: null,
     });
     expect(fetchSpy).toHaveBeenLastCalledWith(staticUrl("kyushu-2024/shops.json"));
   });
@@ -134,7 +157,11 @@ describe("API 模式", () => {
       .mockResolvedValueOnce(jsonResponse([{ id: "static" }]));
     const ds = await importDataSource(apiEnv);
 
-    await expect(ds.loadTrips()).resolves.toEqual({ data: [{ id: "static" }], editable: false });
+    await expect(ds.loadTrips()).resolves.toEqual({
+      data: [{ id: "static", version: 0 }],
+      editable: false,
+      version: null,
+    });
     expect(fetchSpy).toHaveBeenLastCalledWith(staticUrl("trips.json"));
   });
 
@@ -162,32 +189,52 @@ describe("API 模式", () => {
     await expect(ds.loadMe()).resolves.toBeNull();
   });
 
-  it("saveTripData 送出 PUT，不帶 Authorization（身分來自 Access 的 cookie）", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ ok: true }));
+  it("saveTripData 帶著讀到的版本送出 PUT，不帶 Authorization（身分來自 Access 的 cookie）", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse({ ok: true }, 200, { ETag: '"4"' }));
     const ds = await importDataSource(apiEnv);
 
     const data = [{ id: "day-1", day: 1, date: "2024-01-01", items: [] }];
-    await ds.saveTripData("kyushu-2024", "itinerary", data);
+    await expect(ds.saveTripData("kyushu-2024", "itinerary", data, 3)).resolves.toBe(4);
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/trips/kyushu-2024/itinerary", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "If-Match": '"3"' },
       body: JSON.stringify(data),
       redirect: "manual",
     });
   });
 
-  it("saveTrips 送出 PUT /trips", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ ok: true }));
+  it("別人先存過（412）時拋出 ConflictError", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ error: "Changed since it was read; reload and try again" }, 412)
+    );
     const ds = await importDataSource(apiEnv);
 
-    await ds.saveTrips([]);
-    expect(fetchSpy).toHaveBeenCalledWith("/api/trips", expect.objectContaining({ method: "PUT" }));
+    await expect(ds.saveTripData("kyushu-2024", "shops", [], 0)).rejects.toBeInstanceOf(
+      ds.ConflictError
+    );
+  });
+
+  it("updateTrip 帶著讀到的版本送出 PUT /trips/:tripId，回傳新版本的旅程", async () => {
+    const fields = { name: "東京", startDate: "2026-10-01", endDate: "2026-10-05", coverImage: "" };
+    const updated = { ...fields, id: "abc123", version: 2 };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(updated));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.updateTrip("abc123", fields, 1)).resolves.toEqual(updated);
+    expect(fetchSpy).toHaveBeenCalledWith("/api/trips/abc123", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "If-Match": '"1"' },
+      body: JSON.stringify(fields),
+      redirect: "manual",
+    });
   });
 
   it("createTrip 送出 POST /trips，回傳伺服器建立的旅程", async () => {
     const newTrip = { name: "東京", startDate: "2026-10-01", endDate: "2026-10-05", coverImage: "" };
-    const created = { ...newTrip, id: "abc123" };
+    const created = { ...newTrip, id: "abc123", version: 0 };
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(created, 201));
     const ds = await importDataSource(apiEnv);
 
@@ -211,13 +258,13 @@ describe("API 模式", () => {
     });
   });
 
-  it("uploadCover 以圖片本身為 body 送出 PUT，回傳旅程新的 coverImage", async () => {
-    const coverImage = "/api/trips/kyushu-2024/cover?v=1";
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ coverImage }));
+  it("uploadCover 以圖片本身為 body 送出 PUT，回傳旅程新的 coverImage 與版本", async () => {
+    const upload = { coverImage: "/api/trips/kyushu-2024/cover?v=1", version: 1 };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(upload));
     const ds = await importDataSource(apiEnv);
 
     const image = new Blob(["jpeg"], { type: "image/jpeg" });
-    await expect(ds.uploadCover("kyushu-2024", image)).resolves.toBe(coverImage);
+    await expect(ds.uploadCover("kyushu-2024", image)).resolves.toEqual(upload);
     expect(fetchSpy).toHaveBeenCalledWith("/api/trips/kyushu-2024/cover", {
       method: "PUT",
       headers: { "Content-Type": "image/jpeg" },
@@ -237,7 +284,7 @@ describe("API 模式", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ error: "Trip not found" }, 404));
     const ds = await importDataSource(apiEnv);
 
-    await expect(ds.saveTripData("nope", "shops", [])).rejects.toThrow("Trip not found");
+    await expect(ds.saveTripData("nope", "shops", [], 0)).rejects.toThrow("Trip not found");
   });
 
   it("寫入回應非 ok 且 body 不是 JSON 時拋出 HTTP 狀態碼", async () => {
@@ -285,7 +332,7 @@ describe("未登入", () => {
     const listener = vi.fn();
     ds.onSignedOut(listener);
 
-    await expect(ds.saveTrips([])).rejects.toThrow("請先登入");
+    await expect(ds.saveTripData("kyushu-2024", "shops", [], 0)).rejects.toThrow("請先登入");
     expect(listener).toHaveBeenCalledOnce();
   });
 

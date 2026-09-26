@@ -12,11 +12,10 @@ import Info from "./Info";
 
 // The trip pages against a signed-in API: the data layer is mocked at its
 // module boundary (the static-mode behavior is covered by each page's test).
-vi.mock("../dataSource", () => ({
-  apiEnabled: true,
-  loadTripData: vi.fn(),
-  saveTripData: vi.fn(),
-}));
+vi.mock("../dataSource", async (importOriginal) => {
+  const { ConflictError } = await importOriginal<typeof import("../dataSource")>();
+  return { apiEnabled: true, ConflictError, loadTripData: vi.fn(), saveTripData: vi.fn() };
+});
 
 vi.mock("framer-motion", () => ({
   motion: {
@@ -61,9 +60,10 @@ const DATA: TripDataMap = {
   ],
 };
 
+/** Every list was read at version 4. */
 function loaded(editable: boolean) {
   return <T extends DataType>(_tripId: string, type: T) =>
-    Promise.resolve({ data: DATA[type], editable });
+    Promise.resolve({ data: DATA[type], editable, version: 4 });
 }
 
 // `removed` is the text that goes away when the first 刪除 on the page is used.
@@ -86,7 +86,7 @@ beforeEach(() => {
   actionSlot = document.body.appendChild(document.createElement("div"));
   vi.mocked(useOutletContext).mockReturnValue({ trip, editSlot, actionSlot, setNavLocked });
   ds.loadTripData.mockImplementation(loaded(true));
-  ds.saveTripData.mockResolvedValue(undefined);
+  ds.saveTripData.mockImplementation(async (_tripId, _type, _data, version) => version + 1);
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
@@ -164,9 +164,44 @@ describe.each(pages)("$name 編輯模式", ({ Page, type, addLabel, removed }) =
     expect(ds.saveTripData).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole("button", { name: "完成" }));
-    expect(ds.saveTripData).toHaveBeenCalledWith(trip.id, type, expect.any(Array));
+    expect(ds.saveTripData).toHaveBeenCalledWith(trip.id, type, expect.any(Array), 4);
     expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
     expectNoEditControls();
+  });
+
+  it("再次儲存時帶上次儲存後的版本", async () => {
+    // Two of everything, so there is something left to delete the second time.
+    ds.loadTripData.mockImplementation(async (_tripId, t) => {
+      const rows = DATA[t] as { id: string }[];
+      const data = [...rows, ...rows.map((row) => ({ ...row, id: `${row.id}-2` }))];
+      return { data: data as TripDataMap[typeof t], editable: true, version: 4 };
+    });
+    renderPage();
+
+    await startEditing();
+    await deleteFirst();
+    await userEvent.click(screen.getByRole("button", { name: "完成" }));
+    await screen.findByRole("status");
+    await startEditing();
+    await deleteFirst();
+    await userEvent.click(screen.getByRole("button", { name: "完成" }));
+
+    expect(ds.saveTripData).toHaveBeenCalledTimes(2);
+    expect(ds.saveTripData).toHaveBeenLastCalledWith(trip.id, type, expect.any(Array), 5);
+  });
+
+  it("別人先存過時提示、離開編輯模式並載入最新資料", async () => {
+    ds.saveTripData.mockRejectedValueOnce(new dataSource.ConflictError());
+    renderPage();
+
+    await startEditing();
+    await deleteFirst();
+    await userEvent.click(screen.getByRole("button", { name: "完成" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("別人剛修改過，已載入最新版本");
+    expect(await screen.findByText(removed)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "編輯" })).toBeInTheDocument();
+    expect(ds.loadTripData).toHaveBeenCalledTimes(2);
   });
 
   it("儲存失敗時提示原因，留在編輯模式且保留變更", async () => {
@@ -183,8 +218,8 @@ describe.each(pages)("$name 編輯模式", ({ Page, type, addLabel, removed }) =
   });
 
   it("儲存中隱藏編輯控制項，完成按鈕顯示儲存中並停用", async () => {
-    let resolveSave!: () => void;
-    ds.saveTripData.mockReturnValue(new Promise<void>((resolve) => { resolveSave = resolve; }));
+    let resolveSave!: (version: number) => void;
+    ds.saveTripData.mockReturnValue(new Promise<number>((resolve) => { resolveSave = resolve; }));
     renderPage();
 
     await startEditing();
@@ -195,7 +230,7 @@ describe.each(pages)("$name 編輯模式", ({ Page, type, addLabel, removed }) =
     expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
     expectNoEditControls();
 
-    await act(async () => resolveSave());
+    await act(async () => resolveSave(5));
     expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
   });
 
