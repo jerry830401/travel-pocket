@@ -5,7 +5,7 @@ import { conflictingTripsQuery, seedStatements, userIdQuery } from "../src/db/se
 import type { SeedData } from "../src/db/seed";
 import { toSqlText } from "../src/db/statements";
 import type { Statement } from "../src/db/statements";
-import { ALICE, BOB, api, insertTrips, replace, resetDatabase } from "./helpers";
+import { ALICE, BOB, api, insertTrips, ownEntry, replace, resetDatabase } from "./helpers";
 
 // Values with quotes and newlines, to prove toSqlText's literals survive them.
 const trips: Trip[] = [
@@ -58,7 +58,7 @@ const info: InfoItem[] = [
   { id: "info-1", title: "緊急聯絡", icon: "phone", links: [{ label: "代表處", url: "https://example.com" }] },
 ];
 
-const entries: TripEntry[] = trips.map((trip) => ({ ...trip, version: 0 }));
+const entries: TripEntry[] = trips.map((trip) => ownEntry(trip));
 
 const data: SeedData = {
   trips,
@@ -124,7 +124,7 @@ describe("seedStatements", () => {
     const ownerId = crypto.randomUUID();
     await execAsText(seedStatements(ownerId, ALICE, data));
     await execAsText(seedStatements(ownerId, ALICE, data));
-    const again = trips.map((trip) => ({ ...trip, version: 1 }));
+    const again = trips.map((trip) => ownEntry(trip, ALICE, 1));
     expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(again);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
   });

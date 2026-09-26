@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MAX_COVER_BYTES } from "@travel-pocket/shared";
 import type { CoverUpload, Trip, TripEntry } from "@travel-pocket/shared";
-import { ALICE, BOB, api, insertTrips, resetDatabase } from "./helpers";
+import { ALICE, BOB, api, insertTrips, ownEntry, resetDatabase } from "./helpers";
 
 const trips: Trip[] = [
   { id: "sendai-2026", name: "仙台", startDate: "2026-03-01", endDate: "2026-03-08", coverImage: "" },
@@ -15,7 +15,7 @@ const trips: Trip[] = [
   },
 ];
 
-const entries: TripEntry[] = trips.map((trip) => ({ ...trip, version: 0 }));
+const entries: TripEntry[] = trips.map((trip) => ownEntry(trip));
 
 // Just the signatures the API looks at, followed by some payload.
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
@@ -32,8 +32,9 @@ async function listTrips(as = ALICE): Promise<TripEntry[]> {
 }
 
 function putTrip(trip: TripEntry, as = ALICE) {
-  const { id, version, ...fields } = trip;
-  return api(`/trips/${id}`, { method: "PUT", body: fields, as, headers: { "If-Match": `"${version}"` } });
+  const { id, version, name, startDate, endDate, coverImage } = trip;
+  const body = { name, startDate, endDate, coverImage };
+  return api(`/trips/${id}`, { method: "PUT", body, as, headers: { "If-Match": `"${version}"` } });
 }
 
 function countCovers(tripId: string): Promise<number | null> {
@@ -176,7 +177,7 @@ describe("keeping covers in step with their trips", () => {
   it("leaves other users' covers alone", async () => {
     const bobs: Trip = { ...trips[0], id: "bob-trip" };
     await insertTrips(BOB, [bobs]);
-    expect((await putTrip({ ...bobs, version: 0 }, BOB)).status).toBe(200);
+    expect((await putTrip(ownEntry(bobs, BOB), BOB)).status).toBe(200);
     expect(await countCovers("sendai-2026")).toBe(1);
   });
 

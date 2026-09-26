@@ -5,7 +5,15 @@ import { runBatch } from "./run";
 import { getShops } from "./shops";
 import { bumpVersionStatement, replaceTripDataStatements } from "./writes";
 
-export { createTrip, deleteTrip, getVersion, listTrips, tripOwnedBy, updateTrip } from "./trips";
+export { createTrip, deleteTrip, getVersion, listTrips, tripAccess, updateTrip } from "./trips";
+export {
+  approveMember,
+  ensureInviteCode,
+  findInvite,
+  listMembers,
+  removeMember,
+  requestToJoin,
+} from "./members";
 export { isVersionConflict } from "./writes";
 export { ensureUser } from "./users";
 export { getCover, saveCover } from "./covers";

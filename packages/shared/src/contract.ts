@@ -34,12 +34,22 @@ export type NewTrip = Omit<Trip, "id">;
  *   answers with the new `ETag`; the trip's writes return the new `version`.
  */
 
+/** How the signed-in user reaches a trip: they own it, or its owner approved them. */
+export type TripRole = "owner" | "member";
+
 /**
  * A trip as `GET /api/trips` lists it, and as `POST /api/trips` and
- * `PUT /api/trips/:tripId` return it, with the version of its fields.
+ * `PUT /api/trips/:tripId` return it: with the version of its fields, and who
+ * shares it. A trip with no members is personal; any member makes it shared.
  */
 export interface TripEntry extends Trip {
   version: number;
+  role: TripRole;
+  ownerEmail: string;
+  /** Approved members, not counting the owner. */
+  memberCount: number;
+  /** Requests to join that wait for the owner; always 0 for a member. */
+  pendingCount: number;
 }
 
 /** `PUT /api/trips/:tripId` body: the trip's new fields (it keeps its `id`). */
@@ -54,6 +64,51 @@ export function versionTag(version: number): string {
 export function parseVersionTag(tag: string | null | undefined): number | null {
   const match = /^"(\d+)"$/.exec(tag?.trim() ?? "");
   return match ? Number(match[1]) : null;
+}
+
+/*
+ * Sharing. The owner hands out a link with the trip's invite code; whoever
+ * signs in with it asks to join (`POST /api/invites/:code`), and becomes a
+ * member once the owner approves (`PUT /api/trips/:tripId/members/:email`).
+ * Members read and edit the trip like its owner does, but only the owner
+ * deletes it, sees the invite code and manages members; a member may leave
+ * (`DELETE /api/trips/:tripId/members/<their own email>`).
+ */
+
+/** An invite code: 128 random bits in hex. */
+export const INVITE_CODE_PATTERN = /^[0-9a-f]{32}$/;
+
+export type MemberStatus = "member" | "pending";
+
+export interface TripMember {
+  email: string;
+  status: MemberStatus;
+}
+
+/**
+ * `GET /api/trips/:tripId/members`. Members see only the approved members; the
+ * owner also sees pending requests and the invite code (null until created).
+ */
+export interface TripMembers {
+  ownerEmail: string;
+  members: TripMember[];
+  inviteCode: string | null;
+}
+
+/** `POST /api/trips/:tripId/invite`: the trip's invite code, created on first use. */
+export interface TripInvite {
+  inviteCode: string;
+}
+
+/** Where the signed-in user stands with an invited trip: `none` until they ask to join. */
+export type InviteStatus = TripRole | "pending" | "none";
+
+/** `GET` / `POST /api/invites/:code`: the invited trip, and the user's status after the call. */
+export interface Invite {
+  tripId: string;
+  tripName: string;
+  ownerEmail: string;
+  status: InviteStatus;
 }
 
 /** Largest cover image `PUT /api/trips/:tripId/cover` accepts, in bytes. */

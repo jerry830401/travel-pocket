@@ -4,25 +4,43 @@ import { HTTPException } from "hono/http-exception";
 import {
   DATA_TYPES,
   ID_PATTERN,
+  INVITE_CODE_PATTERN,
   MAX_COVER_BYTES,
   parseVersionTag,
   versionTag,
 } from "@travel-pocket/shared";
-import type { CoverUpload, DataType, Me, NewTrip, TripEntry } from "@travel-pocket/shared";
+import type {
+  CoverUpload,
+  DataType,
+  Invite,
+  Me,
+  NewTrip,
+  TripEntry,
+  TripInvite,
+  TripMembers,
+  TripRole,
+} from "@travel-pocket/shared";
 import { requireUser, type AppEnv } from "./auth";
 import {
+  approveMember,
   createTrip,
   deleteTrip,
+  ensureInviteCode,
+  findInvite,
   getCover,
   getTripData,
   getVersion,
   isVersionConflict,
+  listMembers,
   listTrips,
+  removeMember,
   replaceTripData,
+  requestToJoin,
   saveCover,
-  tripOwnedBy,
+  tripAccess,
   updateTrip,
 } from "./db";
+import { normalizeEmail } from "./email";
 import { detectImageType } from "./image";
 
 const app = new Hono<AppEnv>().basePath("/api");
@@ -47,7 +65,8 @@ app.use(
 // Registered before requireUser, so it answers without signing in.
 app.get("/health", (c) => c.json({ ok: true }));
 
-// Every other route acts as the signed-in user and sees only that user's trips.
+// Every other route acts as the signed-in user and sees only the trips they
+// own or were approved to share.
 app.use("*", requireUser);
 
 function isDataType(value: string): value is DataType {
@@ -111,11 +130,28 @@ function requireVersion(c: Context<AppEnv>): number {
   return version;
 }
 
-// Another user's trip answers 404, exactly like a trip that does not exist.
-async function requireOwnTrip(c: Context<AppEnv>, tripId: string): Promise<void> {
-  if (!(await tripOwnedBy(c.env.DB, tripId, c.get("userId")))) {
-    throw new HTTPException(404, { message: "Trip not found" });
+/**
+ * How the user reaches the trip. A trip they do not share answers 404, exactly
+ * like one that does not exist; a member asking for what only the owner may
+ * do gets 403.
+ */
+async function requireTripAccess(
+  c: Context<AppEnv>,
+  tripId: string,
+  need: TripRole = "member"
+): Promise<TripRole> {
+  const role = await tripAccess(c.env.DB, tripId, c.get("userId"));
+  if (!role) throw new HTTPException(404, { message: "Trip not found" });
+  if (need === "owner" && role !== "owner") {
+    throw new HTTPException(403, { message: "Only the trip's owner can do that" });
   }
+  return role;
+}
+
+function parseInviteCode(c: Context<AppEnv>): string {
+  const code = c.req.param("code") ?? "";
+  if (!INVITE_CODE_PATTERN.test(code)) throw new HTTPException(400, { message: "Invalid invite code" });
+  return code;
 }
 
 app.get("/me", (c) => c.json<Me>({ email: c.get("email") }));
@@ -124,7 +160,7 @@ app.get("/trips", async (c) => c.json(await listTrips(c.env.DB, c.get("userId"))
 
 app.post("/trips", async (c) => {
   const fields = parseNewTrip(await readJsonBody(c));
-  return c.json<TripEntry>(await createTrip(c.env.DB, c.get("userId"), fields), 201);
+  return c.json<TripEntry>(await createTrip(c.env.DB, c.get("userId"), c.get("email"), fields), 201);
 });
 
 // Replaces the trip's fields (never its data); a cover it no longer points at is dropped.
@@ -132,24 +168,83 @@ app.put("/trips/:tripId", async (c) => {
   const tripId = parseTripId(c);
   const expected = requireVersion(c);
   const fields = parseNewTrip(await readJsonBody(c));
-  await requireOwnTrip(c, tripId);
-  return c.json<TripEntry>(await updateTrip(c.env.DB, tripId, fields, expected));
+  await requireTripAccess(c, tripId);
+  const userId = c.get("userId");
+  return c.json<TripEntry>(await updateTrip(c.env.DB, tripId, userId, fields, expected));
 });
 
-// The trip's itinerary, shops and info go with it (ON DELETE CASCADE).
+// The trip's itinerary, shops, info and members go with it (ON DELETE CASCADE).
 app.delete("/trips/:tripId", async (c) => {
-  const tripId = c.req.param("tripId");
-  if (!ID_PATTERN.test(tripId)) throw new HTTPException(400, { message: "Invalid tripId" });
+  const tripId = parseTripId(c);
+  await requireTripAccess(c, tripId, "owner");
   if (!(await deleteTrip(c.env.DB, c.get("userId"), tripId))) {
     throw new HTTPException(404, { message: "Trip not found" });
   }
   return c.json({ ok: true });
 });
 
+// Registered before /trips/:tripId/:type, which would take "members" for a type.
+app.get("/trips/:tripId/members", async (c) => {
+  const tripId = parseTripId(c);
+  const role = await requireTripAccess(c, tripId);
+  return c.json<TripMembers>(await listMembers(c.env.DB, tripId, role));
+});
+
+app.post("/trips/:tripId/invite", async (c) => {
+  const tripId = parseTripId(c);
+  await requireTripAccess(c, tripId, "owner");
+  return c.json<TripInvite>({ inviteCode: await ensureInviteCode(c.env.DB, tripId) });
+});
+
+// Approves a request to join.
+app.put("/trips/:tripId/members/:email", async (c) => {
+  const tripId = parseTripId(c);
+  const email = normalizeEmail(c.req.param("email"));
+  await requireTripAccess(c, tripId, "owner");
+  if (!(await approveMember(c.env.DB, tripId, email))) {
+    throw new HTTPException(404, { message: "No such request to join" });
+  }
+  return c.json({ ok: true });
+});
+
+// The owner removes a member or turns down a request; a member removes themself (leaves).
+app.delete("/trips/:tripId/members/:email", async (c) => {
+  const tripId = parseTripId(c);
+  const email = normalizeEmail(c.req.param("email"));
+  const role = await requireTripAccess(c, tripId);
+  if (email === c.get("email")) {
+    if (role === "owner") throw new HTTPException(400, { message: "The owner cannot leave" });
+  } else if (role !== "owner") {
+    throw new HTTPException(403, { message: "Only the trip's owner can do that" });
+  }
+  if (!(await removeMember(c.env.DB, tripId, email))) {
+    throw new HTTPException(404, { message: "No such member" });
+  }
+  return c.json({ ok: true });
+});
+
+// Anyone signed in with the code sees which trip it opens and where they stand.
+app.get("/invites/:code", async (c) => {
+  const invite = await findInvite(c.env.DB, parseInviteCode(c), c.get("userId"));
+  if (!invite) throw new HTTPException(404, { message: "Invite not found" });
+  return c.json<Invite>(invite);
+});
+
+// Asks to join; the owner approves. Asking again changes nothing.
+app.post("/invites/:code", async (c) => {
+  const code = parseInviteCode(c);
+  const userId = c.get("userId");
+  const invite = await findInvite(c.env.DB, code, userId);
+  if (!invite) throw new HTTPException(404, { message: "Invite not found" });
+  if (invite.status !== "none") return c.json<Invite>(invite);
+  await requestToJoin(c.env.DB, invite.tripId, userId);
+  return c.json<Invite>({ ...invite, status: "pending" });
+});
+
 // Registered before /trips/:tripId/:type, which would take "cover" for a type.
 app.get("/trips/:tripId/cover", async (c) => {
   const tripId = parseTripId(c);
-  await requireOwnTrip(c, tripId);
+  await requireTripAccess(c, tripId);
   const cover = await getCover(c.env.DB, tripId);
   if (!cover) throw new HTTPException(404, { message: "Trip has no cover" });
   return c.body(cover.data, 200, {
@@ -166,7 +261,7 @@ app.put("/trips/:tripId/cover", async (c) => {
   const tripId = parseTripId(c);
   const tooLarge = () => new HTTPException(413, { message: "Cover is too large" });
   if (Number(c.req.header("Content-Length")) > MAX_COVER_BYTES) throw tooLarge();
-  await requireOwnTrip(c, tripId);
+  await requireTripAccess(c, tripId);
   const data = await c.req.arrayBuffer();
   if (data.byteLength > MAX_COVER_BYTES) throw tooLarge();
   const contentType = detectImageType(new Uint8Array(data));
@@ -178,7 +273,7 @@ app.put("/trips/:tripId/cover", async (c) => {
 
 app.get("/trips/:tripId/:type", async (c) => {
   const { tripId, type } = parseTripDataParams(c);
-  await requireOwnTrip(c, tripId);
+  await requireTripAccess(c, tripId);
   // The version is read before the data: should a write land in between, the
   // client holds newer data under an older version, and its next write is
   // refused rather than let through over a change it has not seen.
@@ -193,7 +288,7 @@ app.put("/trips/:tripId/:type", async (c) => {
   const { tripId, type } = parseTripDataParams(c);
   const expected = requireVersion(c);
   const data = await readArrayBody(c);
-  await requireOwnTrip(c, tripId);
+  await requireTripAccess(c, tripId);
   const version = await replaceTripData(c.env.DB, tripId, type, data, expected);
   c.header("ETag", versionTag(version));
   return c.json({ ok: true });

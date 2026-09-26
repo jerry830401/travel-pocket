@@ -1,7 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { sign } from "hono/jwt";
 import { vi } from "vitest";
-import type { Trip } from "@travel-pocket/shared";
+import type { Trip, TripEntry } from "@travel-pocket/shared";
 import { upsertTripsStatement } from "../src/db/writes";
 
 // Tests act as Cloudflare Access: they sign JWTs with their own RSA key and
@@ -70,6 +70,12 @@ export function accessToken(
 
 export const ALICE = "alice@example.com";
 export const BOB = "bob@example.com";
+export const CAROL = "carol@example.com";
+
+/** `trip` as its owner lists it while nobody shares it. */
+export function ownEntry(trip: Trip, ownerEmail = ALICE, version = 0): TripEntry {
+  return { ...trip, version, role: "owner", ownerEmail, memberCount: 0, pendingCount: 0 };
+}
 
 interface RequestOptions {
   method?: string;

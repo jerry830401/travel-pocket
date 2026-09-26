@@ -9,6 +9,7 @@ import {
   api,
   foreignKey,
   insertTrips,
+  ownEntry,
   replace,
   resetDatabase,
 } from "./helpers";
@@ -97,7 +98,7 @@ async function json<T>(res: Response | Promise<Response>): Promise<T> {
 }
 
 /** `trips` as GET /trips lists them, before any edit. */
-const entries: TripEntry[] = trips.map((trip) => ({ ...trip, version: 0 }));
+const entries: TripEntry[] = trips.map((trip) => ownEntry(trip));
 
 function seedTrips(as = ALICE) {
   return insertTrips(as, trips);
@@ -202,7 +203,7 @@ describe("PUT /trips/:tripId", () => {
     await seedTrips();
     const res = await putTrip("sendai-2026", renamed, 0);
     expect(res.status).toBe(200);
-    const updated = { ...renamed, id: "sendai-2026", version: 1 };
+    const updated = { ...entries[0], ...renamed, version: 1 };
     expect(await res.json()).toStrictEqual(updated);
     expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([updated, entries[1]]);
   });
@@ -226,7 +227,7 @@ describe("PUT /trips/:tripId", () => {
     const res = await putTrip("sendai-2026", { ...newTrip, name: "舊的" }, 0);
     expect(res.status).toBe(412);
     const [first] = await json<TripEntry[]>(api("/trips", { as: ALICE }));
-    expect(first).toStrictEqual({ ...renamed, id: "sendai-2026", version: 1 });
+    expect(first).toStrictEqual({ ...entries[0], ...renamed, version: 1 });
   });
 
   it("answers 428 without If-Match, and 400 for one that is not a version", async () => {
@@ -273,7 +274,7 @@ describe("POST /trips", () => {
     const res = await api("/trips", { method: "POST", body: newTrip, as: ALICE });
     expect(res.status).toBe(201);
     const created = await json<TripEntry>(res);
-    expect(created).toStrictEqual({ ...newTrip, id: created.id, version: 0 });
+    expect(created).toStrictEqual(ownEntry({ ...newTrip, id: created.id }));
     expect(created.id).toMatch(ID_PATTERN);
     expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([...entries, created]);
   });
@@ -289,13 +290,13 @@ describe("POST /trips", () => {
     const body = { ...newTrip, id: "sendai-2026" };
     const created = await json<TripEntry>(api("/trips", { method: "POST", body, as: ALICE }));
     expect(created.id).not.toBe("sendai-2026");
-    expect(await json(api("/trips", { as: BOB }))).toStrictEqual(entries);
+    expect(await json(api("/trips", { as: BOB }))).toStrictEqual(trips.map((t) => ownEntry(t, BOB)));
   });
 
   it("drops unknown fields, such as the old snapshot", async () => {
     const body = { ...newTrip, snapshot: "data/tokyo/snapshot.jpg" };
     const created = await json<TripEntry>(api("/trips", { method: "POST", body, as: ALICE }));
-    expect(created).toStrictEqual({ ...newTrip, id: created.id, version: 0 });
+    expect(created).toStrictEqual(ownEntry({ ...newTrip, id: created.id }));
     expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([created]);
   });
 

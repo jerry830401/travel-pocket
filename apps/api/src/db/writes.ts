@@ -107,9 +107,47 @@ export function insertTripStatement(ownerId: string, trip: Trip): Statement {
   };
 }
 
-/** Deletes one of the owner's trips; its itinerary, shops, info and cover cascade. */
+/** Deletes one of the owner's trips; its itinerary, shops, info, cover and members cascade. */
 export function deleteTripStatement(ownerId: string, tripId: string): Statement {
   return { sql: "DELETE FROM trips WHERE id = ?1 AND owner_id = ?2", params: [tripId, ownerId] };
+}
+
+/** Gives the trip `code` as its invite code, unless it has one already; returns the code it has. */
+export function ensureInviteCodeStatement(tripId: string, code: string): Statement {
+  return {
+    sql: `UPDATE trips SET invite_code = COALESCE(invite_code, ?2) WHERE id = ?1
+          RETURNING invite_code`,
+    params: [tripId, code],
+  };
+}
+
+/** Asks to join a trip, unless the user owns it or already asked (or joined). */
+export function requestToJoinStatement(tripId: string, userId: string): Statement {
+  return {
+    sql: `INSERT INTO trip_members (trip_id, user_id, status)
+          SELECT ?1, ?2, 'pending'
+          WHERE NOT EXISTS (SELECT 1 FROM trips WHERE id = ?1 AND owner_id = ?2)
+          ON CONFLICT (trip_id, user_id) DO NOTHING`,
+    params: [tripId, userId],
+  };
+}
+
+/** Approves the user bound to `email`, if they asked to join (a member stays one). */
+export function approveMemberStatement(tripId: string, email: string): Statement {
+  return {
+    sql: `UPDATE trip_members SET status = 'member'
+          WHERE trip_id = ?1 AND user_id = (SELECT id FROM users WHERE email = ?2)`,
+    params: [tripId, email],
+  };
+}
+
+/** Removes a member, or turns down a request to join. */
+export function removeMemberStatement(tripId: string, email: string): Statement {
+  return {
+    sql: `DELETE FROM trip_members
+          WHERE trip_id = ?1 AND user_id = (SELECT id FROM users WHERE email = ?2)`,
+    params: [tripId, email],
+  };
 }
 
 /** Where the API serves a trip's uploaded cover (`GET /api/trips/:tripId/cover`). */
