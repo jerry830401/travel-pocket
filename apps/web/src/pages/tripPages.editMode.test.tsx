@@ -54,7 +54,7 @@ const DATA: TripDataMap = {
     },
   ],
   shops: [
-    { id: "shop-1", name: "Bic Camera", location: "博多站", tags: ["家電"], businessHours: "10:00 - 21:00", googleMapLink: "" },
+    { id: "shop-1", name: "Bic Camera", location: "博多站", tags: ["家電"], businessHours: "10:00 - 21:00" },
   ],
   info: [
     { id: "info-1", title: "交通", icon: "🚆", links: [{ label: "JR 九州", url: "https://www.jrkyushu.co.jp/" }] },

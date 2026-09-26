@@ -87,6 +87,7 @@ vi.mock("react-router-dom", async () => {
 
 import { useOutletContext } from "react-router-dom";
 import Schedule from "./Schedule";
+import { mapSearchUrl } from "../mapSearchUrl";
 
 const mockTrip: Trip = {
   id: "trip-test",
@@ -210,5 +211,15 @@ describe("Schedule component", () => {
     renderSchedule();
     // item-1 ends 12:00, item-2 starts 15:00 → gap 3h
     await waitFor(() => expect(screen.getByText("3h")).toBeInTheDocument());
+  });
+
+  it("點開行程後，地點按鈕用地點查詢 Google Map", async () => {
+    const user = userEvent.setup();
+    renderSchedule();
+    await user.click(await screen.findByText("搭飛機出發"));
+    expect(screen.getByRole("link", { name: /桃園機場/ })).toHaveAttribute(
+      "href",
+      mapSearchUrl("桃園機場")
+    );
   });
 });

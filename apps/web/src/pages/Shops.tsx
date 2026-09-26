@@ -6,6 +6,7 @@ import type { TripOutletContext } from "./TripView";
 import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
 import { EditModal, FieldInput, FieldTags, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
 import { useEditSession } from "../components/editor/useEditSession";
+import { mapSearchUrl } from "../mapSearchUrl";
 
 const PIN_SVG = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -23,11 +24,10 @@ type ShopDraft = {
   location: string;
   tags: string[];
   businessHours: string;
-  googleMapLink: string;
 };
 
 const emptyDraft = (): ShopDraft => ({
-  name: "", location: "", tags: [], businessHours: "", googleMapLink: "",
+  name: "", location: "", tags: [], businessHours: "",
 });
 
 function shopToDraft(shop: Shop): ShopDraft {
@@ -36,7 +36,6 @@ function shopToDraft(shop: Shop): ShopDraft {
     location: shop.location,
     tags: shop.tags,
     businessHours: shop.businessHours,
-    googleMapLink: shop.googleMapLink,
   };
 }
 
@@ -251,11 +250,12 @@ const Shops = () => {
                       <DeleteBtn onClick={(e) => handleDelete(shop.id, e)} />
                     </>
                   )}
-                  {shop.googleMapLink && (
+                  {shop.location.trim() && (
                     <a
-                      href={shop.googleMapLink}
+                      href={mapSearchUrl(shop.location)}
                       target="_blank"
                       rel="noopener noreferrer"
+                      aria-label="在 Google Map 查詢地點"
                       className="flex items-center justify-center transition-all duration-150 hover:rotate-[-8deg] hover:scale-105"
                       style={{
                         width: 34, height: 34, borderRadius: "50%",
@@ -311,9 +311,7 @@ const Shops = () => {
           <FieldInput label="店名" value={draft.name} onChange={(v) => setDraft((d) => ({ ...d, name: v }))} placeholder="店家名稱" />
           <FieldInput label="地點" value={draft.location} onChange={(v) => setDraft((d) => ({ ...d, location: v }))} placeholder="地點描述" />
           <FieldInput label="營業時間" value={draft.businessHours} onChange={(v) => setDraft((d) => ({ ...d, businessHours: v }))} placeholder="10:00 - 20:00" />
-          <FieldTags label="標籤" value={draft.tags} onChange={(v) => setDraft((d) => ({ ...d, tags: v }))} placeholder="家電, 轉蛋, 美食" />
-          <FieldInput label="Google Map 連結" value={draft.googleMapLink} onChange={(v) => setDraft((d) => ({ ...d, googleMapLink: v }))} placeholder="https://maps.app.goo.gl/..." type="url" />
-        </EditModal>
+          <FieldTags label="標籤" value={draft.tags} onChange={(v) => setDraft((d) => ({ ...d, tags: v }))} placeholder="家電, 轉蛋, 美食" />        </EditModal>
       )}
     </div>
   );

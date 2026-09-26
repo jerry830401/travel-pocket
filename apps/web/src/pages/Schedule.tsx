@@ -8,6 +8,7 @@ import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
 import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
 import { useEditSession } from "../components/editor/useEditSession";
 import { toMins, gapLabel, dateBig, weekday } from "./scheduleUtils";
+import { mapSearchUrl } from "../mapSearchUrl";
 
 /* Category sticker data */
 const CATS: Record<string, { g: string; cls: string; l: string }> = {
@@ -68,9 +69,7 @@ type ItemDraft = {
   category: string;
   startTime: string;
   endTime: string;
-  googleMapLink: string;
   description: string; // textarea; multi-line → string[]
-  thumbnail: string;
 };
 
 function itemToDraft(item: ItineraryItem): ItemDraft {
@@ -83,9 +82,7 @@ function itemToDraft(item: ItineraryItem): ItemDraft {
     category: item.category,
     startTime: item.startTime,
     endTime: item.endTime,
-    googleMapLink: item.googleMapLink ?? "",
     description: desc,
-    thumbnail: item.thumbnail ?? "",
   };
 }
 
@@ -98,15 +95,13 @@ function draftToItem(draft: ItemDraft, id: string): ItineraryItem {
     category: draft.category as ItineraryItem["category"],
     startTime: draft.startTime,
     endTime: draft.endTime,
-    googleMapLink: draft.googleMapLink || undefined,
     description: lines.length > 1 ? lines : (lines[0] ?? undefined),
-    thumbnail: draft.thumbnail || undefined,
   };
 }
 
 const emptyDraft = (): ItemDraft => ({
   title: "", location: "", category: "sightseeing",
-  startTime: "", endTime: "", googleMapLink: "", description: "", thumbnail: "",
+  startTime: "", endTime: "", description: "",
 });
 
 /* ── Draft state for adding an ItineraryDay ── */
@@ -611,10 +606,7 @@ const Schedule = () => {
 
               <div className="font-mono uppercase mb-2" style={{ fontSize: ".65rem", letterSpacing: ".18em", color: "var(--ink-soft)" }}>地點資訊</div>
               <a
-                href={
-                  selectedItem.item.googleMapLink ||
-                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedItem.item.location)}`
-                }
+                href={mapSearchUrl(selectedItem.item.location)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-hand font-bold flex items-center justify-between mb-4 transition-all duration-150 hover:-translate-y-0.5"
@@ -687,9 +679,7 @@ const Schedule = () => {
             <FieldInput label="開始時間" value={draft.startTime} onChange={(v) => setDraft((d) => ({ ...d, startTime: v }))} placeholder="HH:MM" type="time" />
             <FieldInput label="結束時間" value={draft.endTime} onChange={(v) => setDraft((d) => ({ ...d, endTime: v }))} placeholder="HH:MM" type="time" />
           </div>
-          <FieldInput label="Google Map 連結" value={draft.googleMapLink} onChange={(v) => setDraft((d) => ({ ...d, googleMapLink: v }))} placeholder="https://maps.app.goo.gl/..." type="url" />
           <FieldTextarea label="備忘錄（每行一筆）" value={draft.description} onChange={(v) => setDraft((d) => ({ ...d, description: v }))} placeholder="備忘事項..." rows={3} />
-          <FieldInput label="縮圖 URL（選填）" value={draft.thumbnail} onChange={(v) => setDraft((d) => ({ ...d, thumbnail: v }))} placeholder="https://..." type="url" />
         </EditModal>
       )}
     </div>

@@ -12,6 +12,7 @@ vi.mock("react-router-dom", async () => {
 
 import { useOutletContext } from "react-router-dom";
 import Shops from "./Shops";
+import { mapSearchUrl } from "../mapSearchUrl";
 
 const mockTrip: Trip = {
   id: "trip-test",
@@ -28,7 +29,6 @@ const mockShops: Shop[] = [
     location: "秋葉原",
     tags: ["家電", "3C"],
     businessHours: "10:00 - 21:00",
-    googleMapLink: "https://maps.app.goo.gl/shop1",
   },
   {
     id: "shop-2",
@@ -36,7 +36,6 @@ const mockShops: Shop[] = [
     location: "博多",
     tags: ["美食"],
     businessHours: "11:00 - 22:00",
-    googleMapLink: "",
   },
 ];
 
@@ -116,14 +115,13 @@ describe("Shops", () => {
     expect(screen.getByText("拉麵達人")).toBeInTheDocument();
   });
 
-  it("有 googleMapLink 的店家顯示地圖連結", async () => {
+  it("店家的地圖按鈕用地點查詢 Google Map", async () => {
     renderShops();
     await waitFor(() => screen.getByText("電器天堂"));
-    const links = screen.getAllByRole("link");
-    const mapLink = links.find(
-      (l) => l.getAttribute("href") === "https://maps.app.goo.gl/shop1"
-    );
-    expect(mapLink).toBeInTheDocument();
+    const hrefs = screen
+      .getAllByRole("link", { name: "在 Google Map 查詢地點" })
+      .map((l) => l.getAttribute("href"));
+    expect(hrefs).toEqual([mapSearchUrl("秋葉原"), mapSearchUrl("博多")]);
   });
 
   it("無符合 tag 的店家時顯示空狀態提示", async () => {
