@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useOutletContext } from "react-router-dom";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ToastProvider } from "../contexts/ToastContext";
 import * as dataSource from "../dataSource";
-import type { DataType, Trip, TripDataMap } from "../types";
+import type { DataType, ItineraryDay, Trip, TripDataMap } from "../types";
 import Schedule from "./Schedule";
 import Shops from "./Shops";
 import Info from "./Info";
@@ -61,9 +61,9 @@ const DATA: TripDataMap = {
 };
 
 /** Every list was read at version 4. */
-function loaded(editable: boolean) {
+function loaded(editable: boolean, data: TripDataMap = DATA) {
   return <T extends DataType>(_tripId: string, type: T) =>
-    Promise.resolve({ data: DATA[type], editable, version: 4 });
+    Promise.resolve({ data: data[type], editable, version: 4 });
 }
 
 // `removed` is the text that goes away when the first 刪除 on the page is used.
@@ -273,5 +273,72 @@ describe("日程：取消草稿中新增的日", () => {
     expect(screen.queryByRole("button", { name: /Day 2/ })).not.toBeInTheDocument();
     expect(screen.getByText("太宰府")).toBeInTheDocument();
     expect(screen.queryByText("無行程資料")).not.toBeInTheDocument();
+  });
+});
+
+describe("日程：編輯日", () => {
+  // day-1 (03-10, with 太宰府) and an empty day-2 (03-11), read at version 4.
+  const twoDays: ItineraryDay[] = [
+    DATA.itinerary[0],
+    { id: "day-2", day: 2, date: "2024-03-11", items: [] },
+  ];
+
+  beforeEach(() => {
+    ds.loadTripData.mockImplementation(loaded(true, { ...DATA, itinerary: twoDays }));
+  });
+
+  /** Changes the selected day in the 編輯日 modal and confirms it. */
+  async function editDay(date: string, day: string) {
+    await userEvent.click(screen.getAllByTitle("編輯")[0]);
+    const dialog = screen.getByRole("dialog", { name: "編輯日" });
+    fireEvent.change(within(dialog).getByDisplayValue(/^2024-/), { target: { value: date } });
+    const dayInput = within(dialog).getByPlaceholderText("1 或 8A");
+    await userEvent.clear(dayInput);
+    await userEvent.type(dayInput, day);
+    await userEvent.click(within(dialog).getByRole("button", { name: "確定" }));
+  }
+
+  it("檢視模式沒有編輯日的按鈕", async () => {
+    renderWithProviders(Schedule);
+    expect(await screen.findByRole("button", { name: "編輯" })).toBeInTheDocument();
+    expect(screen.queryByTitle("編輯")).not.toBeInTheDocument();
+  });
+
+  it("表單帶入目前的值，改日期後重新排序、仍選著這天且保留行程，完成才儲存", async () => {
+    renderWithProviders(Schedule);
+    await userEvent.click(await screen.findByRole("button", { name: "編輯" }));
+
+    await userEvent.click(screen.getAllByTitle("編輯")[0]);
+    const dialog = screen.getByRole("dialog", { name: "編輯日" });
+    expect(within(dialog).getByDisplayValue("2024-03-10")).toBeInTheDocument();
+    expect(within(dialog).getByDisplayValue("1")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+
+    await editDay("2024-03-12", "3");
+
+    // Day 1 moved after Day 2 and is still the one shown, with its item.
+    const tags = screen.getAllByRole("button", { name: /^Day / });
+    expect(tags.map((t) => t.textContent)).toEqual(["Day 203-11", "Day 303-12"]);
+    expect(screen.getByText(/DAY 3/)).toBeInTheDocument();
+    expect(screen.getByText("太宰府")).toBeInTheDocument();
+    expect(ds.saveTripData).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "完成" }));
+    expect(ds.saveTripData).toHaveBeenCalledWith(trip.id, "itinerary", [
+      twoDays[1],
+      { ...twoDays[0], day: 3, date: "2024-03-12" },
+    ], 4);
+  });
+
+  it("取消時還原被編輯的日", async () => {
+    renderWithProviders(Schedule);
+    await userEvent.click(await screen.findByRole("button", { name: "編輯" }));
+
+    await editDay("2024-03-12", "3");
+    await userEvent.click(screen.getByRole("button", { name: "取消" }));
+
+    const tags = screen.getAllByRole("button", { name: /^Day / });
+    expect(tags.map((t) => t.textContent)).toEqual(["Day 103-10", "Day 203-11"]);
+    expect(ds.saveTripData).not.toHaveBeenCalled();
   });
 });

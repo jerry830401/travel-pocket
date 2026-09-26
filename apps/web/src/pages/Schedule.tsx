@@ -104,7 +104,7 @@ const emptyDraft = (): ItemDraft => ({
   startTime: "", endTime: "", description: "",
 });
 
-/* ── Draft state for adding an ItineraryDay ── */
+/* ── Draft state for adding or editing an ItineraryDay ── */
 type DayDraft = { date: string; day: string };
 
 function nextDateStr(dateStr: string): string {
@@ -149,7 +149,9 @@ const Schedule = () => {
   const [draft, setDraft] = useState<ItemDraft>(emptyDraft());
 
   /* Day-level edit state */
-  const [isAddingDay, setIsAddingDay] = useState(false);
+  const [dayModalOpen, setDayModalOpen] = useState(false);
+  // The day the modal edits, or null when it adds a new one.
+  const [editDayId, setEditDayId] = useState<string | null>(null);
   const [dayDraft, setDayDraft] = useState<DayDraft>({ date: "", day: "1" });
 
   useEffect(() => {
@@ -225,7 +227,14 @@ const Schedule = () => {
       date: last ? nextDateStr(last.date) : "",
       day: String(days.length + 1),
     });
-    setIsAddingDay(true);
+    setEditDayId(null);
+    setDayModalOpen(true);
+  };
+
+  const openEditDay = (day: ItineraryDay) => {
+    setDayDraft({ date: day.date, day: String(day.day) });
+    setEditDayId(day.id);
+    setDayModalOpen(true);
   };
 
   const handleDeleteDay = (dayId: string) => {
@@ -239,16 +248,19 @@ const Schedule = () => {
 
   const handleSaveDay = () => {
     const parsedDay = Number(dayDraft.day);
-    const newDay: ItineraryDay = {
-      id: `day-${Date.now()}`,
+    const fields = {
       day: isNaN(parsedDay) ? dayDraft.day : parsedDay,
       date: dayDraft.date,
-      items: [],
     };
-    const next = [...days, newDay].sort((a, b) => a.date.localeCompare(b.date));
+    const id = editDayId ?? `day-${Date.now()}`;
+    // An edited day keeps its id and items; a new one starts empty.
+    const next = (editDayId
+      ? days.map((d) => (d.id === editDayId ? { ...d, ...fields } : d))
+      : [...days, { id, ...fields, items: [] }]
+    ).sort((a, b) => a.date.localeCompare(b.date));
     setDays(next);
-    setDayIdx(next.findIndex((d) => d.id === newDay.id));
-    setIsAddingDay(false);
+    setDayIdx(next.findIndex((d) => d.id === id));
+    setDayModalOpen(false);
   };
 
   const handleDelete = (itemId: string, dayId: string, e: React.MouseEvent) => {
@@ -399,7 +411,10 @@ const Schedule = () => {
             {weekday(currentDay.date)} · DAY {currentDay.day}
           </span>
           {canEdit && (
-            <DeleteBtn onClick={() => handleDeleteDay(currentDay.id)} />
+            <div className="flex gap-0.5">
+              <EditBtn onClick={() => openEditDay(currentDay)} />
+              <DeleteBtn onClick={() => handleDeleteDay(currentDay.id)} />
+            </div>
           )}
         </div>
       )}
@@ -649,12 +664,12 @@ const Schedule = () => {
         )}
       </AnimatePresence>
 
-      {/* Add day modal */}
+      {/* Add / edit day modal */}
       {canEdit && (
         <EditModal
-          title="新增日"
-          open={isAddingDay}
-          onClose={() => setIsAddingDay(false)}
+          title={editDayId ? "編輯日" : "新增日"}
+          open={dayModalOpen}
+          onClose={() => setDayModalOpen(false)}
           onSave={handleSaveDay}
         >
           <FieldInput label="日期" value={dayDraft.date} onChange={(v) => setDayDraft((d) => ({ ...d, date: v }))} type="date" />
