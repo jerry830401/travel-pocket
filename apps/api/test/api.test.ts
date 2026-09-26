@@ -1,8 +1,17 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ID_PATTERN } from "@travel-pocket/shared";
-import type { InfoItem, ItineraryDay, NewTrip, Shop, Trip } from "@travel-pocket/shared";
-import { ALICE, BOB, accessToken, api, foreignKey, resetDatabase } from "./helpers";
+import type { InfoItem, ItineraryDay, NewTrip, Shop, Trip, TripEntry } from "@travel-pocket/shared";
+import {
+  ALICE,
+  BOB,
+  accessToken,
+  api,
+  foreignKey,
+  insertTrips,
+  replace,
+  resetDatabase,
+} from "./helpers";
 
 const trips: Trip[] = [
   {
@@ -87,8 +96,16 @@ async function json<T>(res: Response | Promise<Response>): Promise<T> {
   return (await res).json() as Promise<T>;
 }
 
-async function seedTrips(as = ALICE) {
-  expect((await api("/trips", { method: "PUT", body: trips, as })).status).toBe(200);
+/** `trips` as GET /trips lists them, before any edit. */
+const entries: TripEntry[] = trips.map((trip) => ({ ...trip, version: 0 }));
+
+function seedTrips(as = ALICE) {
+  return insertTrips(as, trips);
+}
+
+function putTrip(tripId: string, body: unknown, version: number | string, as = ALICE) {
+  const ifMatch = typeof version === "number" ? `"${version}"` : version;
+  return api(`/trips/${tripId}`, { method: "PUT", body, as, headers: { "If-Match": ifMatch } });
 }
 
 beforeEach(resetDatabase);
@@ -106,7 +123,7 @@ describe("authentication", () => {
     ["GET", "/me"],
     ["GET", "/trips"],
     ["POST", "/trips"],
-    ["PUT", "/trips"],
+    ["PUT", "/trips/sendai-2026"],
     ["DELETE", "/trips/sendai-2026"],
     ["GET", "/trips/sendai-2026/shops"],
     ["PUT", "/trips/sendai-2026/shops"],
@@ -154,9 +171,7 @@ describe("DEV_USER_EMAIL", () => {
   );
 
   it("never applies to other hosts", async () => {
-    expect((await api("/me", { origin: "https://travel-pocket.example.workers.dev" })).status).toBe(
-      401
-    );
+    expect((await api("/me", { origin: "https://travel-pocket.example.workers.dev" })).status).toBe(401);
   });
 
   it("gives way to an Access JWT", async () => {
@@ -165,49 +180,90 @@ describe("DEV_USER_EMAIL", () => {
   });
 });
 
-describe("/trips", () => {
+describe("GET /trips", () => {
   it("returns an empty array when there are no trips", async () => {
     const res = await api("/trips", { as: ALICE });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
   });
 
-  it("round-trips trips in order, omitting absent optional fields", async () => {
+  it("lists trips in order with their versions, omitting absent optional fields", async () => {
     await seedTrips();
     const res = await api("/trips", { as: ALICE });
     expect(res.headers.get("Content-Type")).toMatch(/application\/json/);
-    expect(await res.json()).toStrictEqual(trips);
+    expect(await res.json()).toStrictEqual(entries);
+  });
+});
+
+describe("PUT /trips/:tripId", () => {
+  const renamed: NewTrip = { ...newTrip, name: "仙台（改）" };
+
+  it("replaces the trip's fields and returns it with a new version", async () => {
+    await seedTrips();
+    const res = await putTrip("sendai-2026", renamed, 0);
+    expect(res.status).toBe(200);
+    const updated = { ...renamed, id: "sendai-2026", version: 1 };
+    expect(await res.json()).toStrictEqual(updated);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([updated, entries[1]]);
   });
 
-  it("upserts: updates existing trips and follows the new order", async () => {
+  it("does not touch the trip's data", async () => {
     await seedTrips();
-    const updated = [{ ...trips[1], name: "九州 2024" }, trips[0]];
-    expect((await api("/trips", { method: "PUT", body: updated, as: ALICE })).status).toBe(200);
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(updated);
-  });
+    await replace("/trips/sendai-2026/itinerary", itinerary, ALICE);
+    await replace("/trips/sendai-2026/shops", shops, ALICE);
+    await replace("/trips/sendai-2026/info", info, ALICE);
 
-  it("does not cascade-delete a trip's data", async () => {
-    await seedTrips();
-    await api("/trips/sendai-2026/itinerary", { method: "PUT", body: itinerary, as: ALICE });
-    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
-    await api("/trips/sendai-2026/info", { method: "PUT", body: info, as: ALICE });
-
-    const renamed = [{ ...trips[0], name: "仙台（改）" }];
-    expect((await api("/trips", { method: "PUT", body: renamed, as: ALICE })).status).toBe(200);
+    expect((await putTrip("sendai-2026", renamed, 0)).status).toBe(200);
 
     expect(await json(api("/trips/sendai-2026/itinerary", { as: ALICE }))).toStrictEqual(itinerary);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
     expect(await json(api("/trips/sendai-2026/info", { as: ALICE }))).toStrictEqual(info);
   });
 
-  it("rejects a trip whose id does not match ID_PATTERN", async () => {
-    const body = [{ ...trips[0], id: "bad id" }];
-    expect((await api("/trips", { method: "PUT", body, as: ALICE })).status).toBe(400);
+  it("answers 412 and changes nothing when the trip changed since it was read", async () => {
+    await seedTrips();
+    expect((await putTrip("sendai-2026", renamed, 0)).status).toBe(200);
+    const res = await putTrip("sendai-2026", { ...newTrip, name: "舊的" }, 0);
+    expect(res.status).toBe(412);
+    const [first] = await json<TripEntry[]>(api("/trips", { as: ALICE }));
+    expect(first).toStrictEqual({ ...renamed, id: "sendai-2026", version: 1 });
   });
 
-  it("rejects a body that is not an array", async () => {
-    expect((await api("/trips", { method: "PUT", body: trips[0], as: ALICE })).status).toBe(400);
-    expect((await api("/trips", { method: "PUT", body: "{not json", as: ALICE })).status).toBe(400);
+  it("answers 428 without If-Match, and 400 for one that is not a version", async () => {
+    await seedTrips();
+    const res = await api("/trips/sendai-2026", { method: "PUT", body: renamed, as: ALICE });
+    expect(res.status).toBe(428);
+    expect((await putTrip("sendai-2026", renamed, "*")).status).toBe(400);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(entries);
+  });
+
+  it.each([
+    ["a missing field", { ...renamed, name: undefined }],
+    ["an array", [renamed]],
+    ["invalid JSON", "{not json"],
+  ])("rejects a body with %s", async (_, body) => {
+    await seedTrips();
+    expect((await putTrip("sendai-2026", body, 0)).status).toBe(400);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(entries);
+  });
+
+  it("keeps its id whatever the body says", async () => {
+    await seedTrips();
+    await putTrip("sendai-2026", { ...renamed, id: "kyushu-2024" }, 0);
+    const listed = await json<TripEntry[]>(api("/trips", { as: ALICE }));
+    expect(listed.map((trip) => trip.id)).toEqual(["sendai-2026", "kyushu-2024"]);
+    expect(listed[1]).toStrictEqual(entries[1]);
+  });
+
+  it("answers 404 for a trip that does not exist, and 400 for an invalid tripId", async () => {
+    expect((await putTrip("nowhere", renamed, 0)).status).toBe(404);
+    expect((await putTrip("bad.id", renamed, 0)).status).toBe(400);
+  });
+
+  it("is gone for the whole list", async () => {
+    await seedTrips();
+    const res = await api("/trips", { method: "PUT", body: trips, as: ALICE });
+    expect(res.status).toBe(404);
   });
 });
 
@@ -216,14 +272,14 @@ describe("POST /trips", () => {
     await seedTrips();
     const res = await api("/trips", { method: "POST", body: newTrip, as: ALICE });
     expect(res.status).toBe(201);
-    const created = await json<Trip>(res);
-    expect(created).toStrictEqual({ ...newTrip, id: created.id });
+    const created = await json<TripEntry>(res);
+    expect(created).toStrictEqual({ ...newTrip, id: created.id, version: 0 });
     expect(created.id).toMatch(ID_PATTERN);
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([...trips, created]);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([...entries, created]);
   });
 
   it("starts a first trip for a new user", async () => {
-    const created = await json<Trip>(api("/trips", { method: "POST", body: newTrip, as: ALICE }));
+    const created = await json<TripEntry>(api("/trips", { method: "POST", body: newTrip, as: ALICE }));
     expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([created]);
     expect(await json(api(`/trips/${created.id}/shops`, { as: ALICE }))).toEqual([]);
   });
@@ -231,15 +287,15 @@ describe("POST /trips", () => {
   it("ignores an id sent by the client", async () => {
     await seedTrips(BOB);
     const body = { ...newTrip, id: "sendai-2026" };
-    const created = await json<Trip>(api("/trips", { method: "POST", body, as: ALICE }));
+    const created = await json<TripEntry>(api("/trips", { method: "POST", body, as: ALICE }));
     expect(created.id).not.toBe("sendai-2026");
-    expect(await json(api("/trips", { as: BOB }))).toStrictEqual(trips);
+    expect(await json(api("/trips", { as: BOB }))).toStrictEqual(entries);
   });
 
   it("drops unknown fields, such as the old snapshot", async () => {
     const body = { ...newTrip, snapshot: "data/tokyo/snapshot.jpg" };
-    const created = await json<Trip>(api("/trips", { method: "POST", body, as: ALICE }));
-    expect(created).toStrictEqual({ ...newTrip, id: created.id });
+    const created = await json<TripEntry>(api("/trips", { method: "POST", body, as: ALICE }));
+    expect(created).toStrictEqual({ ...newTrip, id: created.id, version: 0 });
     expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([created]);
   });
 
@@ -263,15 +319,15 @@ describe("DELETE /trips/:tripId", () => {
 
   it("deletes the trip together with its itinerary, shops and info", async () => {
     await seedTrips();
-    await api("/trips/sendai-2026/itinerary", { method: "PUT", body: itinerary, as: ALICE });
-    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
-    await api("/trips/sendai-2026/info", { method: "PUT", body: info, as: ALICE });
+    await replace("/trips/sendai-2026/itinerary", itinerary, ALICE);
+    await replace("/trips/sendai-2026/shops", shops, ALICE);
+    await replace("/trips/sendai-2026/info", info, ALICE);
 
     const res = await api("/trips/sendai-2026", { method: "DELETE", as: ALICE });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
 
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([trips[1]]);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([entries[1]]);
     expect((await api("/trips/sendai-2026/shops", { as: ALICE })).status).toBe(404);
     for (const table of ["itinerary_days", "itinerary_items", "shops", "info_items"]) {
       expect(await countRows(table, "sendai-2026")).toBe(0);
@@ -280,16 +336,16 @@ describe("DELETE /trips/:tripId", () => {
 
   it("keeps the user's other trips and their data", async () => {
     await seedTrips();
-    await api("/trips/kyushu-2024/shops", { method: "PUT", body: shops, as: ALICE });
+    await replace("/trips/kyushu-2024/shops", shops, ALICE);
     await api("/trips/sendai-2026", { method: "DELETE", as: ALICE });
     expect(await json(api("/trips/kyushu-2024/shops", { as: ALICE }))).toStrictEqual(shops);
   });
 
   it("answers 404 for another user's trip and leaves it alone", async () => {
     await seedTrips(ALICE);
-    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
+    await replace("/trips/sendai-2026/shops", shops, ALICE);
     expect((await api("/trips/sendai-2026", { method: "DELETE", as: BOB })).status).toBe(404);
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(trips);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(entries);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
   });
 
@@ -309,7 +365,7 @@ describe("/trips/:tripId/:type", () => {
     ["info", info],
   ] as const)("round-trips %s, including JSON fields and order", async (type, data) => {
     await seedTrips();
-    const put = await api(`/trips/sendai-2026/${type}`, { method: "PUT", body: data, as: ALICE });
+    const put = await replace(`/trips/sendai-2026/${type}`, data, ALICE);
     expect(put.status).toBe(200);
     const res = await api(`/trips/sendai-2026/${type}`, { as: ALICE });
     expect(res.status).toBe(200);
@@ -324,22 +380,22 @@ describe("/trips/:tripId/:type", () => {
   it("stores numeric days as strings", async () => {
     await seedTrips();
     const body = [{ ...itinerary[0], day: 1 }];
-    await api("/trips/sendai-2026/itinerary", { method: "PUT", body, as: ALICE });
+    await replace("/trips/sendai-2026/itinerary", body, ALICE);
     const [day] = await json<ItineraryDay[]>(api("/trips/sendai-2026/itinerary", { as: ALICE }));
     expect(day.day).toBe("1");
   });
 
   it("replaces the previous data instead of merging", async () => {
     await seedTrips();
-    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
-    await api("/trips/sendai-2026/shops", { method: "PUT", body: [shops[1]], as: ALICE });
+    await replace("/trips/sendai-2026/shops", shops, ALICE);
+    await replace("/trips/sendai-2026/shops", [shops[1]], ALICE);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual([shops[1]]);
   });
 
   it("keeps data of other trips untouched", async () => {
     await seedTrips();
-    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
-    await api("/trips/kyushu-2024/shops", { method: "PUT", body: [shops[0]], as: ALICE });
+    await replace("/trips/sendai-2026/shops", shops, ALICE);
+    await replace("/trips/kyushu-2024/shops", [shops[0]], ALICE);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
   });
 
@@ -354,9 +410,9 @@ describe("/trips/:tripId/:type", () => {
       })),
     }));
     const oldShops = shops.map((shop) => ({ ...shop, googleMapLink: "https://maps.example/shop" }));
-    const putItinerary = await api("/trips/sendai-2026/itinerary", { method: "PUT", body: oldItinerary, as: ALICE });
+    const putItinerary = await replace("/trips/sendai-2026/itinerary", oldItinerary, ALICE);
     expect(putItinerary.status).toBe(200);
-    expect((await api("/trips/sendai-2026/shops", { method: "PUT", body: oldShops, as: ALICE })).status).toBe(200);
+    expect((await replace("/trips/sendai-2026/shops", oldShops, ALICE)).status).toBe(200);
     expect(await json(api("/trips/sendai-2026/itinerary", { as: ALICE }))).toStrictEqual(itinerary);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
   });
@@ -369,82 +425,128 @@ describe("/trips/:tripId/:type", () => {
       date: `2026-04-${String(d + 1).padStart(2, "0")}`,
       items: Array.from({ length: 10 }, (_, i) => ({ ...itinerary[0].items[0], id: `item-${i}` })),
     }));
-    const put = await api("/trips/sendai-2026/itinerary", { method: "PUT", body: days, as: ALICE });
+    const put = await replace("/trips/sendai-2026/itinerary", days, ALICE);
     expect(put.status).toBe(200);
     expect(await json(api("/trips/sendai-2026/itinerary", { as: ALICE }))).toStrictEqual(days);
   });
 
   it("returns 404 for a trip that does not exist", async () => {
-    expect((await api("/trips/nowhere/shops", { method: "PUT", body: shops, as: ALICE })).status).toBe(
-      404
-    );
+    expect((await replace("/trips/nowhere/shops", shops, ALICE)).status).toBe(404);
     expect((await api("/trips/nowhere/shops", { as: ALICE })).status).toBe(404);
   });
 
   it("returns 400 for an invalid tripId", async () => {
-    expect((await api("/trips/bad.id/shops", { method: "PUT", body: shops, as: ALICE })).status).toBe(
-      400
-    );
+    expect((await replace("/trips/bad.id/shops", shops, ALICE)).status).toBe(400);
     expect((await api("/trips/bad%20id/shops", { as: ALICE })).status).toBe(400);
   });
 
   it("returns 400 for an unknown type", async () => {
     await seedTrips();
-    expect((await api("/trips/sendai-2026/hotels", { method: "PUT", body: [], as: ALICE })).status).toBe(
-      400
-    );
+    expect((await replace("/trips/sendai-2026/hotels", [], ALICE)).status).toBe(400);
     expect((await api("/trips/sendai-2026/hotels", { as: ALICE })).status).toBe(400);
   });
 
   it("returns 400 when the body is not an array", async () => {
     await seedTrips();
-    const res = await api("/trips/sendai-2026/shops", { method: "PUT", body: shops[0], as: ALICE });
+    const res = await replace("/trips/sendai-2026/shops", shops[0], ALICE);
     expect(res.status).toBe(400);
   });
 
   it("returns 400 and keeps the old data when an element is missing fields", async () => {
     await seedTrips();
-    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
-    const res = await api("/trips/sendai-2026/shops", {
-      method: "PUT",
-      body: [{ id: "shop-3" }],
-      as: ALICE,
-    });
+    await replace("/trips/sendai-2026/shops", shops, ALICE);
+    const res = await replace("/trips/sendai-2026/shops", [{ id: "shop-3" }], ALICE);
     expect(res.status).toBe(400);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
+    // Nothing was written, so the version stays too.
+    const get = await api("/trips/sendai-2026/shops", { as: ALICE });
+    expect(get.headers.get("ETag")).toBe('"1"');
+  });
+});
+
+describe("versions of a trip's data", () => {
+  function put(type: string, body: unknown, ifMatch?: string) {
+    const headers: Record<string, string> = ifMatch === undefined ? {} : { "If-Match": ifMatch };
+    return api(`/trips/sendai-2026/${type}`, { method: "PUT", body, as: ALICE, headers });
+  }
+
+  beforeEach(() => seedTrips());
+
+  it("answers GET with the version as ETag, starting at 0", async () => {
+    const res = await api("/trips/sendai-2026/shops", { as: ALICE });
+    expect(res.headers.get("ETag")).toBe('"0"');
+  });
+
+  it("bumps the version on every write and answers with the new ETag", async () => {
+    const first = await put("shops", shops, '"0"');
+    expect(first.status).toBe(200);
+    expect(first.headers.get("ETag")).toBe('"1"');
+    const second = await put("shops", [shops[0]], '"1"');
+    expect(second.headers.get("ETag")).toBe('"2"');
+    const get = await api("/trips/sendai-2026/shops", { as: ALICE });
+    expect(get.headers.get("ETag")).toBe('"2"');
+  });
+
+  it("answers 412 and keeps the data when the version is stale", async () => {
+    await put("shops", shops, '"0"');
+    const res = await put("shops", [], '"0"');
+    expect(res.status).toBe(412);
+    expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
+    const get = await api("/trips/sendai-2026/shops", { as: ALICE });
+    expect(get.headers.get("ETag")).toBe('"1"');
+  });
+
+  it("answers 412 for a version from the future", async () => {
+    expect((await put("shops", shops, '"5"')).status).toBe(412);
+    expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toEqual([]);
+  });
+
+  it("lets only one of two writes based on the same version through", async () => {
+    const results = await Promise.all([put("shops", shops, '"0"'), put("shops", [shops[1]], '"0"')]);
+    expect(results.map((res) => res.status).sort()).toEqual([200, 412]);
+    const winner = results[0].status === 200 ? shops : [shops[1]];
+    expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(winner);
+  });
+
+  it("keeps a separate version for each list and for the trip's fields", async () => {
+    await put("shops", shops, '"0"');
+    expect((await put("info", info, '"0"')).status).toBe(200);
+    expect((await put("itinerary", itinerary, '"0"')).status).toBe(200);
+    expect((await putTrip("sendai-2026", newTrip, 0)).status).toBe(200);
+  });
+
+  it("answers 428 without If-Match, and 400 for one that is not a version", async () => {
+    expect((await put("shops", shops)).status).toBe(428);
+    expect((await put("shops", shops, "*")).status).toBe(400);
+    expect((await put("shops", shops, "W/\"0\"")).status).toBe(400);
+    expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toEqual([]);
   });
 });
 
 describe("isolation between users", () => {
   beforeEach(async () => {
     await seedTrips(ALICE);
-    await api("/trips/sendai-2026/shops", { method: "PUT", body: shops, as: ALICE });
+    await replace("/trips/sendai-2026/shops", shops, ALICE);
   });
 
   it("lists only the signed-in user's trips", async () => {
     expect(await json(api("/trips", { as: BOB }))).toEqual([]);
-    const bobs = await json<Trip>(api("/trips", { method: "POST", body: newTrip, as: BOB }));
+    const bobs = await json<TripEntry>(api("/trips", { method: "POST", body: newTrip, as: BOB }));
     expect(await json(api("/trips", { as: BOB }))).toStrictEqual([bobs]);
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(trips);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(entries);
   });
 
   it("answers 404 for another user's trip data, and leaves it untouched", async () => {
     expect((await api("/trips/sendai-2026/shops", { as: BOB })).status).toBe(404);
-    const put = await api("/trips/sendai-2026/shops", { method: "PUT", body: [], as: BOB });
+    const put = await replace("/trips/sendai-2026/shops", [], BOB);
     expect(put.status).toBe(404);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
   });
 
-  it("refuses an upsert that reuses another user's trip id", async () => {
-    const hijack = [{ ...trips[0], name: "Bob's now" }];
-    expect((await api("/trips", { method: "PUT", body: hijack, as: BOB })).status).toBe(409);
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(trips);
-    expect(await json(api("/trips", { as: BOB }))).toEqual([]);
-  });
-
-  it("writes nothing when any id in the upsert is taken", async () => {
-    const mixed = [{ ...trips[0], id: "bob-trip" }, trips[1]];
-    expect((await api("/trips", { method: "PUT", body: mixed, as: BOB })).status).toBe(409);
+  it("answers 404 for another user's trip fields, and leaves them untouched", async () => {
+    const hijack = { ...newTrip, name: "Bob's now" };
+    expect((await putTrip("sendai-2026", hijack, 0, BOB)).status).toBe(404);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(entries);
     expect(await json(api("/trips", { as: BOB }))).toEqual([]);
   });
 });
@@ -466,7 +568,7 @@ describe("CORS", () => {
       headers: {
         Origin: "http://localhost:5173",
         "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": "Content-Type",
+        "Access-Control-Request-Headers": "Content-Type, If-Match",
       },
     });
     expect(res.status).toBe(204);
@@ -474,5 +576,11 @@ describe("CORS", () => {
     expect(res.headers.get("Access-Control-Allow-Methods")).toMatch(/PUT/);
     expect(res.headers.get("Access-Control-Allow-Methods")).toMatch(/DELETE/);
     expect(res.headers.get("Access-Control-Allow-Headers")).toMatch(/Content-Type/i);
+    expect(res.headers.get("Access-Control-Allow-Headers")).toMatch(/If-Match/i);
+  });
+
+  it("lets allowed origins read the ETag", async () => {
+    const res = await api("/health", { headers: { Origin: "http://localhost:5173" } });
+    expect(res.headers.get("Access-Control-Expose-Headers")).toMatch(/ETag/i);
   });
 });

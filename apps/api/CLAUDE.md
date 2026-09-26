@@ -34,33 +34,35 @@ Local setup: `db:migrate:local`, then `db:seed --owner dev@example.com` so the d
 
 ## API
 
-All routes live under `/api` (`basePath`). Data shapes, the `Me` / `NewTrip` / `CoverUpload` request and response types, and the `ID_PATTERN` / `DATA_TYPES` / `MAX_COVER_BYTES` validation constants come from `@travel-pocket/shared`.
+All routes live under `/api` (`basePath`). Data shapes, the `Me` / `NewTrip` / `TripEntry` / `TripUpdate` / `CoverUpload` request and response types, the `ID_PATTERN` / `DATA_TYPES` / `MAX_COVER_BYTES` validation constants and the `versionTag` / `parseVersionTag` helpers come from `@travel-pocket/shared`.
 
 | Route | Behavior |
 |---|---|
 | `GET /health` | `{ ok: true }`; no sign-in |
 | `GET /me` | `Me`: the signed-in user's email |
-| `GET /trips` | The user's `Trip[]`, ordered by `position` |
-| `POST /trips` | Creates a trip from a `NewTrip` under a server-assigned id, after the user's last trip; 201 with the `Trip` |
-| `PUT /trips` | Upsert only — never deletes trip rows. Array index becomes `position`. Drops the user's uploaded covers that their trip's `coverImage` no longer points at. 409 (and nothing written) if any id belongs to another user |
+| `GET /trips` | The user's `TripEntry[]` (each trip with the `version` of its fields), ordered by `position` |
+| `POST /trips` | Creates a trip from a `NewTrip` under a server-assigned id, after the user's last trip; 201 with the `TripEntry` (version 0) |
+| `PUT /trips/:tripId` | Replaces the trip's fields with a `TripUpdate`, never its data, if `If-Match` names their current version; returns the `TripEntry` with the new version. Drops the trip's uploaded cover once `coverImage` no longer points at it. 404 like `DELETE` |
 | `DELETE /trips/:tripId` | Deletes the trip; its itinerary, shops, info and cover cascade. 404 if the trip does not exist or belongs to another user |
 | `GET /trips/:tripId/cover` | The uploaded cover image, with its stored `Content-Type`, `Cache-Control: private, max-age=31536000, immutable` and `nosniff`; 404 if there is none or the trip belongs to another user |
-| `PUT /trips/:tripId/cover` | Body is the image itself (at most `MAX_COVER_BYTES`, else 413). Only JPEG, PNG and WebP are kept, judged by the bytes rather than the header (400 otherwise, SVG included). Points the trip's `coverImage` at `/api/trips/:tripId/cover?v=<time>` and returns it as `CoverUpload`; 404 like `GET` |
-| `GET /trips/:tripId/:type` | `TripDataMap[type]`; 404 if the trip does not exist or belongs to another user |
-| `PUT /trips/:tripId/:type` | Replaces the trip's data of that type in one `DB.batch()` (one transaction); 404 like `GET` |
+| `PUT /trips/:tripId/cover` | Body is the image itself (at most `MAX_COVER_BYTES`, else 413). Only JPEG, PNG and WebP are kept, judged by the bytes rather than the header (400 otherwise, SVG included). Points the trip's `coverImage` at `/api/trips/:tripId/cover?v=<time>`, bumps the trip's `version` (no `If-Match` needed) and returns both as `CoverUpload`; 404 like `GET` |
+| `GET /trips/:tripId/:type` | `TripDataMap[type]`, with its version in `ETag`; 404 if the trip does not exist or belongs to another user |
+| `PUT /trips/:tripId/:type` | Replaces the trip's data of that type in one `DB.batch()` (one transaction) if `If-Match` names its current version, and answers with the new `ETag`; 404 like `GET` |
 
-- 400 for an invalid `tripId`, unknown `type`, a body of the wrong shape or not JSON, or data that violates a table constraint (missing field, duplicate id).
+- 400 for an invalid `tripId`, unknown `type`, a body of the wrong shape or not JSON, an `If-Match` that is not a version, or data that violates a table constraint (missing field, duplicate id).
+- Versions (#31): the two `PUT`s that replace data need `If-Match: "<version>"` (428 without it). A stale version answers 412 and writes nothing, so a client never overwrites a change it has not seen; the web app then reloads. There is no `PUT /trips` for the whole list any more.
 - The two cover routes are registered before `/trips/:tripId/:type`, which would otherwise take `cover` for a type.
 - Trip ids are global (`trips.id` is the primary key). Only `db:seed` brings in existing ids; everything else gets a server-assigned one from `POST /trips`.
-- CORS allows only the comma-separated origins in the `CORS_ORIGINS` var. In production the web app is served from the same origin, so this only matters for local tools.
+- CORS allows only the comma-separated origins in the `CORS_ORIGINS` var, with the `If-Match` request header and the `ETag` response header. In production the web app is served from the same origin, so this only matters for local tools.
 
 ## Data Layer
 
-- `migrations/0001_init.sql` — `trips`, `itinerary_days`, `itinerary_items`, `shops`, `info_items`. `migrations/0002_users.sql` — `users`, and rebuilds `trips` with `owner_id` (existing trips were dropped; they had no owner). `migrations/0003_trip_covers.sql` — `trip_covers` (one uploaded image per trip, as a BLOB), and merges the old `snapshot` path into `cover_image` before dropping the column. `migrations/0004_drop_map_links.sql` — drops `itinerary_items.google_map_link`, `itinerary_items.thumbnail` and `shops.google_map_link` (the app searches maps by location). Every child table cascades from its parent (`users` → `trips` → the rest), and D1 enforces foreign keys by default, so **`PUT /trips` must stay an upsert**: deleting or replacing a trip row wipes its itinerary, shops and info. Only `DELETE /trips/:tripId` removes trip rows, on purpose.
+- `migrations/0001_init.sql` — `trips`, `itinerary_days`, `itinerary_items`, `shops`, `info_items`. `migrations/0002_users.sql` — `users`, and rebuilds `trips` with `owner_id` (existing trips were dropped; they had no owner). `migrations/0003_trip_covers.sql` — `trip_covers` (one uploaded image per trip, as a BLOB), and merges the old `snapshot` path into `cover_image` before dropping the column. `migrations/0004_drop_map_links.sql` — drops `itinerary_items.google_map_link`, `itinerary_items.thumbnail` and `shops.google_map_link` (the app searches maps by location). `migrations/0005_versions.sql` — `trips.version` (the trip's fields), `itinerary_version`, `shops_version` and `info_version`. Every child table cascades from its parent (`users` → `trips` → the rest), and D1 enforces foreign keys by default, so **trip rows are only ever updated in place** (`UPDATE`, or the seed's upsert): deleting or replacing a trip row wipes its itinerary, shops and info. Only `DELETE /trips/:tripId` removes trip rows, on purpose.
 - `src/db/writes.ts` — every write, as plain `Statement`s (`src/db/statements.ts`: SQL with `?1`-style params). The API runs them through `src/db/run.ts`; `scripts/seed.ts` renders them to SQL text with `toSqlText` (params inlined as literals, one statement per line). These files, and `src/db/seed.ts` (the seed's statements and queries) and `src/email.ts`, must stay free of D1 types so the Node script can import them.
 - `src/db/statements.ts` — `SqlValue` may be an `ArrayBuffer`, which D1 stores as a BLOB and `toSqlText` inlines as `X'…'`.
 - Covers live in `trip_covers`, apart from `trips`, so listing trips never reads an image. `saveCoverStatements` stores one and points `cover_image` at it in one batch; the URL carries a version so caches never serve an old image. A cover is kept only while its trip's `cover_image` still starts with `/api/trips/<id>/cover` (`deleteStaleCoversStatement`, run with every `PUT /trips`). `src/db/covers.ts` reads and saves them; `src/image.ts` recognizes the formats.
-- `src/db/<type>.ts` — row types, row → shared type converters (`toTrip`, `toShop`, …) and queries. `src/db/users.ts` binds emails to user ids. `src/db/index.ts` dispatches by `DataType`.
+- Versions: a guarded write starts its batch with `bumpVersionStatement`, which sets the version column to `version + 1` when it equals the expected one and to NULL otherwise. The column's NOT NULL constraint rejects the NULL, so the whole batch rolls back, and `isVersionConflict` recognizes that error so `onError` answers 412 instead of the usual 400. The check and the write are one transaction, so two writes based on the same version can never both pass. The seed is not based on a read and bumps with `touchVersionStatement` (and its upsert) instead. `GET /trips/:tripId/:type` reads the version before the data, so a write landing in between makes the client's next write fail rather than pass.
+- `src/db/<type>.ts` — row types, row → shared type converters (`toTripEntry`, `toShop`, …) and queries. `src/db/users.ts` binds emails to user ids. `src/db/index.ts` dispatches by `DataType`.
 - Array and nested values (`tags`, `links`, `description`) are stored as JSON text. `day` is stored as text, so numeric days come back as strings. `category` has no CHECK constraint because real data uses values outside the union type.
 - Writes pass the whole array as one JSON parameter and insert it with `INSERT … SELECT … FROM json_each(?)`. This keeps each request at a fixed, small number of statements regardless of data size (the Free plan allows 50 queries per invocation and 100 bound parameters per query). Keep new write paths in this form rather than one `INSERT` per row.
 
@@ -78,5 +80,6 @@ All routes live under `/api` (`basePath`). Data shapes, the `Me` / `NewTrip` / `
 - `vitest.config.ts` reads `migrations/` into a `TEST_MIGRATIONS` binding; `test/apply-migrations.ts` applies them before tests. It also binds a test Access team and AUD, and `DEV_USER_EMAIL`.
 - `test/helpers.ts` plays Cloudflare Access: it generates an RSA key, serves the public key at the team's certs URL (by spying on `fetch`), and signs JWTs with `accessToken(email)`. `api(path, { as: email })` sends a signed-in request to a non-local host, so `DEV_USER_EMAIL` only applies when a test asks for a `localhost` origin.
 - Storage is isolated per test file, not per test: `resetDatabase()` in `beforeEach` deletes `users`, which cascades to everything else.
+- `insertTrips(email, trips)` gives a user trips under fixed ids straight in D1 (the API assigns ids itself); `replace(path, body, as)` PUTs a trip's list with the version a GET just answered.
 - `test/seed.test.ts` runs `seedStatements` as SQL text through `DB.exec`, the way `wrangler d1 execute --file` does.
 - Tests call the Worker through `exports.default.fetch` from `cloudflare:workers`.

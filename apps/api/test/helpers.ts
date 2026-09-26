@@ -1,6 +1,8 @@
 import { env, exports } from "cloudflare:workers";
 import { sign } from "hono/jwt";
 import { vi } from "vitest";
+import type { Trip } from "@travel-pocket/shared";
+import { upsertTripsStatement } from "../src/db/writes";
 
 // Tests act as Cloudflare Access: they sign JWTs with their own RSA key and
 // serve its public half from the team's certs URL, which the app fetches.
@@ -95,6 +97,29 @@ export async function api(path: string, options: RequestOptions = {}): Promise<R
     },
     body: raw ? body : JSON.stringify(body),
   });
+}
+
+/**
+ * Gives `email` these trips under their own ids, straight in D1 the way the
+ * seed does, since the API assigns ids itself. Signs the user in first.
+ */
+export async function insertTrips(email: string, trips: readonly Trip[]): Promise<void> {
+  await api("/me", { as: email });
+  const ownerId = await env.DB.prepare("SELECT id FROM users WHERE email = ?")
+    .bind(email)
+    .first<string>("id");
+  if (!ownerId) throw new Error(`No user for ${email}`);
+  const { sql, params } = upsertTripsStatement(ownerId, trips);
+  await env.DB.prepare(sql).bind(...params).run();
+}
+
+/**
+ * PUTs `body` over a trip's list as a client that just read it would: with the
+ * version the GET answered in `ETag` (or 0 when there was none).
+ */
+export async function replace(path: string, body: unknown, as = ALICE): Promise<Response> {
+  const etag = (await api(path, { as })).headers.get("ETag") ?? '"0"';
+  return api(path, { method: "PUT", body, as, headers: { "If-Match": etag } });
 }
 
 export async function resetDatabase(): Promise<void> {

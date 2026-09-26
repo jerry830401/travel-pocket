@@ -9,6 +9,6 @@ export function run(db: D1Database, statement: Statement): Promise<D1Result> {
 }
 
 /** Runs the statements as one batch, which D1 executes as a single transaction. */
-export async function runBatch(db: D1Database, statements: readonly Statement[]): Promise<void> {
-  await db.batch(statements.map((statement) => prepare(db, statement)));
+export function runBatch(db: D1Database, statements: readonly Statement[]): Promise<D1Result[]> {
+  return db.batch(statements.map((statement) => prepare(db, statement)));
 }

@@ -1,3 +1,4 @@
+import type { CoverUpload } from "@travel-pocket/shared";
 import { runBatch } from "./run";
 import { coverPath, saveCoverStatements } from "./writes";
 
@@ -21,16 +22,18 @@ export async function getCover(db: D1Database, tripId: string): Promise<Cover | 
 }
 
 /**
- * Stores the trip's cover and points its `coverImage` at it. The URL changes
- * with every upload, so browsers and the service worker never show an old one.
+ * Stores the trip's cover and points its `coverImage` at it, which bumps the
+ * trip's version. The URL changes with every upload, so browsers and the
+ * service worker never show an old one.
  */
 export async function saveCover(
   db: D1Database,
   tripId: string,
   contentType: string,
   data: ArrayBuffer
-): Promise<string> {
+): Promise<CoverUpload> {
   const coverImage = `${coverPath(tripId)}?v=${Date.now()}`;
-  await runBatch(db, saveCoverStatements(tripId, contentType, data, coverImage));
-  return coverImage;
+  const results = await runBatch(db, saveCoverStatements(tripId, contentType, data, coverImage));
+  const [{ version }] = results[results.length - 1].results as { version: number }[];
+  return { coverImage, version };
 }

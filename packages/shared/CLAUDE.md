@@ -5,14 +5,14 @@ Guidance for `@travel-pocket/shared`, the data types and API contract shared by 
 ## Contents
 
 - [src/types.ts](src/types.ts) — all data interfaces (`Trip`, `ItineraryDay`, `ItineraryItem`, `Shop`, `InfoItem`, …)
-- [src/contract.ts](src/contract.ts) — API contract: `TripDataMap`, `DataType`, `DATA_TYPES`, `ID_PATTERN`, the cover limits `MAX_COVER_BYTES` and `COVER_CONTENT_TYPES`, and the request/response shapes `Me` (`GET /api/me`), `NewTrip` (`POST /api/trips`) and `CoverUpload` (`PUT /api/trips/:tripId/cover`)
+- [src/contract.ts](src/contract.ts) — API contract: `TripDataMap`, `DataType`, `DATA_TYPES`, `ID_PATTERN`, the cover limits `MAX_COVER_BYTES` and `COVER_CONTENT_TYPES`, the request/response shapes `Me` (`GET /api/me`), `NewTrip` (`POST /api/trips`), `TripEntry` (the trips `GET /api/trips` lists, with their `version`), `TripUpdate` (`PUT /api/trips/:tripId`) and `CoverUpload` (`PUT /api/trips/:tripId/cover`), and the version rules with their `ETag` / `If-Match` helpers `versionTag` and `parseVersionTag`
 - [src/index.ts](src/index.ts) — the package entry, re-exporting both
 
 ## Conventions
 
 - Ships TypeScript source with no build step; `exports` points at `./src/index.ts`. The `build` script is `tsc --noEmit`, a type check only.
 - Relative imports must keep the `.ts` extension, because `apps/web/vite.config.ts` loads this package through Node's native type stripping, which does not resolve extensionless paths.
-- Currently types and plain constants only, with no runtime dependencies. Any dependency added later must be runtime-agnostic (a schema library like zod is fine; React, Hono, or Node-only libraries are not). It compiles with `lib: ["ES2022"]` and `types: []` so that DOM, Node, or Workers APIs fail to type-check (Isolation Rule 4).
+- Types, plain constants and small pure functions only, with no runtime dependencies. Any dependency added later must be runtime-agnostic (a schema library like zod is fine; React, Hono, or Node-only libraries are not). It compiles with `lib: ["ES2022"]` and `types: []` so that DOM, Node, or Workers APIs fail to type-check (Isolation Rule 4).
 - Every change here affects all dependent apps. Verify them before committing (Isolation Rule 8):
 
   ```bash

@@ -1,7 +1,12 @@
 import { DATA_TYPES } from "@travel-pocket/shared";
 import type { Trip, TripDataMap } from "@travel-pocket/shared";
 import type { Statement } from "./statements";
-import { insertUserStatement, replaceTripDataStatements, upsertTripsStatement } from "./writes";
+import {
+  insertUserStatement,
+  replaceTripDataStatements,
+  touchVersionStatement,
+  upsertTripsStatement,
+} from "./writes";
 
 // Statements behind scripts/seed.ts, which imports @travel-pocket/data into one
 // account with `wrangler d1 execute` instead of going through the API. Kept
@@ -30,7 +35,8 @@ export function conflictingTripsQuery(email: string, tripIds: readonly string[])
 
 /**
  * Imports `data` into the account bound to `email`. `ownerId` must be that
- * account's id, or a fresh one when the account does not exist yet.
+ * account's id, or a fresh one when the account does not exist yet. What it
+ * replaces gets a new version, so a client editing an older copy is refused.
  */
 export function seedStatements(ownerId: string, email: string, data: SeedData): Statement[] {
   return [
@@ -39,7 +45,9 @@ export function seedStatements(ownerId: string, email: string, data: SeedData): 
     ...data.trips.flatMap((trip) =>
       DATA_TYPES.flatMap((type) => {
         const rows = data.tripData[trip.id]?.[type];
-        return rows ? replaceTripDataStatements(trip.id, type, rows) : [];
+        return rows
+          ? [touchVersionStatement(trip.id, type), ...replaceTripDataStatements(trip.id, type, rows)]
+          : [];
       })
     ),
   ];

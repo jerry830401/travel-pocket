@@ -1,20 +1,27 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { DATA_TYPES, ID_PATTERN, MAX_COVER_BYTES } from "@travel-pocket/shared";
-import type { CoverUpload, DataType, Me, NewTrip, Trip } from "@travel-pocket/shared";
+import {
+  DATA_TYPES,
+  ID_PATTERN,
+  MAX_COVER_BYTES,
+  parseVersionTag,
+  versionTag,
+} from "@travel-pocket/shared";
+import type { CoverUpload, DataType, Me, NewTrip, TripEntry } from "@travel-pocket/shared";
 import { requireUser, type AppEnv } from "./auth";
 import {
   createTrip,
   deleteTrip,
   getCover,
   getTripData,
+  getVersion,
+  isVersionConflict,
   listTrips,
   replaceTripData,
   saveCover,
-  tripIdsOwnedByOthers,
   tripOwnedBy,
-  upsertTrips,
+  updateTrip,
 } from "./db";
 import { detectImageType } from "./image";
 
@@ -32,7 +39,8 @@ app.use(
     origin: (origin, c: Context<AppEnv>) =>
       allowedOrigins(c.env).includes(origin) ? origin : null,
     allowMethods: ["GET", "POST", "PUT", "DELETE"],
-    allowHeaders: ["Content-Type"],
+    allowHeaders: ["Content-Type", "If-Match"],
+    exposeHeaders: ["ETag"],
   })
 );
 
@@ -73,12 +81,6 @@ async function readArrayBody(c: Context<AppEnv>): Promise<unknown[]> {
   return body;
 }
 
-function isTrip(value: unknown): value is Trip {
-  if (typeof value !== "object" || value === null) return false;
-  const { id } = value as { id?: unknown };
-  return typeof id === "string" && ID_PATTERN.test(id);
-}
-
 const NEW_TRIP_FIELDS = ["name", "startDate", "endDate", "coverImage"] as const;
 
 // Copies only the known fields, so a client-sent `id` never reaches the insert.
@@ -100,6 +102,15 @@ function parseNewTrip(body: unknown): NewTrip {
   };
 }
 
+// The version a write is based on (see the contract): 428 without If-Match.
+function requireVersion(c: Context<AppEnv>): number {
+  const header = c.req.header("If-Match");
+  if (header === undefined) throw new HTTPException(428, { message: "If-Match required" });
+  const version = parseVersionTag(header);
+  if (version === null) throw new HTTPException(400, { message: "Invalid If-Match" });
+  return version;
+}
+
 // Another user's trip answers 404, exactly like a trip that does not exist.
 async function requireOwnTrip(c: Context<AppEnv>, tripId: string): Promise<void> {
   if (!(await tripOwnedBy(c.env.DB, tripId, c.get("userId")))) {
@@ -113,19 +124,16 @@ app.get("/trips", async (c) => c.json(await listTrips(c.env.DB, c.get("userId"))
 
 app.post("/trips", async (c) => {
   const fields = parseNewTrip(await readJsonBody(c));
-  return c.json(await createTrip(c.env.DB, c.get("userId"), fields), 201);
+  return c.json<TripEntry>(await createTrip(c.env.DB, c.get("userId"), fields), 201);
 });
 
-app.put("/trips", async (c) => {
-  const trips = await readArrayBody(c);
-  if (!trips.every(isTrip)) {
-    throw new HTTPException(400, { message: "Every trip needs an id matching ID_PATTERN" });
-  }
-  const userId = c.get("userId");
-  const taken = await tripIdsOwnedByOthers(c.env.DB, trips.map((trip) => trip.id), userId);
-  if (taken.length > 0) throw new HTTPException(409, { message: "Trip id already in use" });
-  await upsertTrips(c.env.DB, userId, trips);
-  return c.json({ ok: true });
+// Replaces the trip's fields (never its data); a cover it no longer points at is dropped.
+app.put("/trips/:tripId", async (c) => {
+  const tripId = parseTripId(c);
+  const expected = requireVersion(c);
+  const fields = parseNewTrip(await readJsonBody(c));
+  await requireOwnTrip(c, tripId);
+  return c.json<TripEntry>(await updateTrip(c.env.DB, tripId, fields, expected));
 });
 
 // The trip's itinerary, shops and info go with it (ON DELETE CASCADE).
@@ -165,26 +173,39 @@ app.put("/trips/:tripId/cover", async (c) => {
   if (!contentType) {
     throw new HTTPException(400, { message: "Cover must be a JPEG, PNG or WebP image" });
   }
-  return c.json<CoverUpload>({ coverImage: await saveCover(c.env.DB, tripId, contentType, data) });
+  return c.json<CoverUpload>(await saveCover(c.env.DB, tripId, contentType, data));
 });
 
 app.get("/trips/:tripId/:type", async (c) => {
   const { tripId, type } = parseTripDataParams(c);
   await requireOwnTrip(c, tripId);
-  return c.json(await getTripData(c.env.DB, tripId, type));
+  // The version is read before the data: should a write land in between, the
+  // client holds newer data under an older version, and its next write is
+  // refused rather than let through over a change it has not seen.
+  const version = await getVersion(c.env.DB, tripId, type);
+  if (version === null) throw new HTTPException(404, { message: "Trip not found" });
+  const data = await getTripData(c.env.DB, tripId, type);
+  c.header("ETag", versionTag(version));
+  return c.json(data);
 });
 
 app.put("/trips/:tripId/:type", async (c) => {
   const { tripId, type } = parseTripDataParams(c);
+  const expected = requireVersion(c);
   const data = await readArrayBody(c);
   await requireOwnTrip(c, tripId);
-  await replaceTripData(c.env.DB, tripId, type, data);
+  const version = await replaceTripData(c.env.DB, tripId, type, data, expected);
+  c.header("ETag", versionTag(version));
   return c.json({ ok: true });
 });
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
     return err.res ? err.getResponse() : c.json({ error: err.message }, err.status);
+  }
+  // Checked first: a stale version surfaces as a NOT NULL constraint failure.
+  if (isVersionConflict(err)) {
+    return c.json({ error: "Changed since it was read; reload and try again" }, 412);
   }
   // Missing fields, duplicate ids and the like surface as constraint failures.
   if (err.message.includes("SQLITE_CONSTRAINT")) {

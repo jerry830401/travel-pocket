@@ -1,4 +1,4 @@
-import type { DataType, InfoItem, ItineraryDay, Shop, Trip } from "@travel-pocket/shared";
+import type { DataType, InfoItem, ItineraryDay, NewTrip, Shop, Trip } from "@travel-pocket/shared";
 import type { Statement } from "./statements";
 
 // Every write the API and scripts/seed.ts perform, as plain statements.
@@ -14,9 +14,54 @@ export function insertUserStatement(id: string, email: string): Statement {
   };
 }
 
+/** What a version covers: the trip's own fields, or one of its lists. */
+export type VersionedPart = "trip" | DataType;
+
+/** The `trips` column holding each part's version. */
+export const VERSION_COLUMNS: Record<VersionedPart, string> = {
+  trip: "version",
+  itinerary: "itinerary_version",
+  shops: "shops_version",
+  info: "info_version",
+};
+
+/**
+ * Bumps a version, but only from `expected`. Any other version becomes NULL,
+ * which the column's NOT NULL constraint rejects, and that failure rolls back
+ * the whole batch (see `isVersionConflict`). Put it first in the batch of the
+ * write it guards.
+ */
+export function bumpVersionStatement(
+  tripId: string,
+  part: VersionedPart,
+  expected: number
+): Statement {
+  const column = VERSION_COLUMNS[part];
+  return {
+    sql: `UPDATE trips SET ${column} = CASE WHEN ${column} = ?2 THEN ${column} + 1 END
+          WHERE id = ?1`,
+    params: [tripId, expected],
+  };
+}
+
+/** Bumps a version whatever it is, for writes that are not based on a read (the seed). */
+export function touchVersionStatement(tripId: string, part: VersionedPart): Statement {
+  const column = VERSION_COLUMNS[part];
+  return { sql: `UPDATE trips SET ${column} = ${column} + 1 WHERE id = ?1`, params: [tripId] };
+}
+
+/** Whether a failed batch was stopped by `bumpVersionStatement`. */
+export function isVersionConflict(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const columns = Object.values(VERSION_COLUMNS).join("|");
+  return new RegExp(`NOT NULL constraint failed: trips\\.(${columns})\\b`).test(err.message);
+}
+
 // Upsert only, never delete: removing a trip row cascades to its itinerary,
 // shops and info. The array index becomes the position. A trip that belongs to
 // another user is never updated; callers reject those ids before writing.
+// Used by the seed, which is not based on a read, so updated trips get a new
+// version whatever they had.
 // `WHERE true` resolves SQLite's parsing ambiguity between SELECT and ON CONFLICT.
 export function upsertTripsStatement(ownerId: string, trips: readonly Trip[]): Statement {
   return {
@@ -29,10 +74,27 @@ export function upsertTripsStatement(ownerId: string, trips: readonly Trip[]): S
             start_date = excluded.start_date,
             end_date = excluded.end_date,
             cover_image = excluded.cover_image,
-            position = excluded.position
+            position = excluded.position,
+            version = trips.version + 1
           WHERE trips.owner_id = excluded.owner_id`,
     params: [JSON.stringify(trips), ownerId],
   };
+}
+
+/**
+ * Replaces a trip's fields if its version is still `expected`, and drops its
+ * uploaded cover once `coverImage` no longer points at it. Run as one batch.
+ */
+export function updateTripStatements(tripId: string, fields: NewTrip, expected: number): Statement[] {
+  return [
+    bumpVersionStatement(tripId, "trip", expected),
+    {
+      sql: `UPDATE trips SET name = ?2, start_date = ?3, end_date = ?4, cover_image = ?5
+            WHERE id = ?1`,
+      params: [tripId, fields.name, fields.startDate, fields.endDate, fields.coverImage],
+    },
+    deleteStaleCoverStatement(tripId),
+  ];
 }
 
 /** Inserts a trip after the owner's last one. */
@@ -55,7 +117,10 @@ export function coverPath(tripId: string): string {
   return `/api/trips/${tripId}/cover`;
 }
 
-/** Stores a trip's cover and points the trip at `coverImage`. Run as one batch. */
+/**
+ * Stores a trip's cover and points the trip at `coverImage`, bumping its
+ * version (the last statement returns the new one). Run as one batch.
+ */
 export function saveCoverStatements(
   tripId: string,
   contentType: string,
@@ -70,18 +135,21 @@ export function saveCoverStatements(
               data = excluded.data`,
       params: [tripId, contentType, data],
     },
-    { sql: "UPDATE trips SET cover_image = ?2 WHERE id = ?1", params: [tripId, coverImage] },
+    {
+      sql: "UPDATE trips SET cover_image = ?2, version = version + 1 WHERE id = ?1 RETURNING version",
+      params: [tripId, coverImage],
+    },
   ];
 }
 
 // A cover is kept only while its trip's cover_image points at it (coverPath,
-// plus a version query). Saving a trip with another image, or none, drops it.
-export function deleteStaleCoversStatement(ownerId: string): Statement {
+// plus a version query). Saving the trip with another image, or none, drops it.
+function deleteStaleCoverStatement(tripId: string): Statement {
   return {
     sql: `DELETE FROM trip_covers WHERE trip_id IN (
             SELECT id FROM trips
-            WHERE owner_id = ?1 AND cover_image NOT LIKE '/api/trips/' || id || '/cover%')`,
-    params: [ownerId],
+            WHERE id = ?1 AND cover_image NOT LIKE '/api/trips/' || id || '/cover%')`,
+    params: [tripId],
   };
 }
 
@@ -135,6 +203,7 @@ function replaceInfoStatements(tripId: string, items: readonly InfoItem[]): Stat
 
 // `data` is only checked to be an array; the table constraints reject
 // elements with missing fields (reported as 400 by the app's error handler).
+// The API guards these with bumpVersionStatement, the seed with touchVersionStatement.
 export function replaceTripDataStatements(
   tripId: string,
   type: DataType,

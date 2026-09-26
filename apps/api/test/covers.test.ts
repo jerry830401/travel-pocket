@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MAX_COVER_BYTES } from "@travel-pocket/shared";
-import type { CoverUpload, Trip } from "@travel-pocket/shared";
-import { ALICE, BOB, api, resetDatabase } from "./helpers";
+import type { CoverUpload, Trip, TripEntry } from "@travel-pocket/shared";
+import { ALICE, BOB, api, insertTrips, resetDatabase } from "./helpers";
 
 const trips: Trip[] = [
   { id: "sendai-2026", name: "仙台", startDate: "2026-03-01", endDate: "2026-03-08", coverImage: "" },
@@ -15,6 +15,8 @@ const trips: Trip[] = [
   },
 ];
 
+const entries: TripEntry[] = trips.map((trip) => ({ ...trip, version: 0 }));
+
 // Just the signatures the API looks at, followed by some payload.
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 4, 5]);
@@ -25,8 +27,13 @@ function upload(tripId: string, body: Uint8Array, as = ALICE, type = "image/jpeg
   return api(`/trips/${tripId}/cover`, { method: "PUT", body, as, headers: { "Content-Type": type } });
 }
 
-async function listTrips(as = ALICE): Promise<Trip[]> {
+async function listTrips(as = ALICE): Promise<TripEntry[]> {
   return (await api("/trips", { as })).json();
+}
+
+function putTrip(trip: TripEntry, as = ALICE) {
+  const { id, version, ...fields } = trip;
+  return api(`/trips/${id}`, { method: "PUT", body: fields, as, headers: { "If-Match": `"${version}"` } });
 }
 
 function countCovers(tripId: string): Promise<number | null> {
@@ -37,16 +44,22 @@ function countCovers(tripId: string): Promise<number | null> {
 
 beforeEach(async () => {
   await resetDatabase();
-  expect((await api("/trips", { method: "PUT", body: trips, as: ALICE })).status).toBe(200);
+  await insertTrips(ALICE, trips);
 });
 
 describe("PUT /trips/:tripId/cover", () => {
-  it("stores the image and points the trip at it", async () => {
+  it("stores the image, points the trip at it and bumps the trip's version", async () => {
     const res = await upload("sendai-2026", jpeg);
     expect(res.status).toBe(200);
-    const { coverImage } = await res.json<CoverUpload>();
+    const { coverImage, version } = await res.json<CoverUpload>();
     expect(coverImage).toMatch(/^\/api\/trips\/sendai-2026\/cover\?v=\d+$/);
-    expect(await listTrips()).toStrictEqual([{ ...trips[0], coverImage }, trips[1]]);
+    expect(version).toBe(1);
+    expect(await listTrips()).toStrictEqual([{ ...entries[0], coverImage, version }, entries[1]]);
+  });
+
+  it("makes an edit based on the version before the upload stale", async () => {
+    await upload("sendai-2026", jpeg);
+    expect((await putTrip({ ...entries[0], name: "舊的" })).status).toBe(412);
   });
 
   it("replaces the previous cover", async () => {
@@ -76,7 +89,7 @@ describe("PUT /trips/:tripId/cover", () => {
   it("answers 404 for another user's trip and leaves it alone", async () => {
     expect((await upload("sendai-2026", jpeg, BOB)).status).toBe(404);
     expect(await countCovers("sendai-2026")).toBe(0);
-    expect(await listTrips()).toStrictEqual(trips);
+    expect(await listTrips()).toStrictEqual(entries);
   });
 
   it("answers 404 for a trip that does not exist", async () => {
@@ -128,15 +141,15 @@ describe("GET /trips/:tripId/cover", () => {
 });
 
 describe("keeping covers in step with their trips", () => {
-  let coverImage: string;
+  let uploaded: TripEntry;
 
   beforeEach(async () => {
-    ({ coverImage } = await (await upload("sendai-2026", jpeg)).json<CoverUpload>());
+    const { coverImage, version } = await (await upload("sendai-2026", jpeg)).json<CoverUpload>();
+    uploaded = { ...entries[0], coverImage, version };
   });
 
   it("keeps the cover while the trip still points at it", async () => {
-    const renamed = [{ ...trips[0], name: "仙台（改）", coverImage }, trips[1]];
-    expect((await api("/trips", { method: "PUT", body: renamed, as: ALICE })).status).toBe(200);
+    expect((await putTrip({ ...uploaded, name: "仙台（改）" })).status).toBe(200);
     expect((await api("/trips/sendai-2026/cover", { as: ALICE })).status).toBe(200);
   });
 
@@ -144,15 +157,26 @@ describe("keeping covers in step with their trips", () => {
     ["removed", ""],
     ["replaced by another image", "/data/sendai-2026/snapshot.jpg"],
   ])("drops the cover once it is %s", async (_, next) => {
-    const body = [{ ...trips[0], coverImage: next }, trips[1]];
-    expect((await api("/trips", { method: "PUT", body, as: ALICE })).status).toBe(200);
+    expect((await putTrip({ ...uploaded, coverImage: next })).status).toBe(200);
     expect(await countCovers("sendai-2026")).toBe(0);
     expect((await api("/trips/sendai-2026/cover", { as: ALICE })).status).toBe(404);
   });
 
+  it("keeps the cover when a stale edit is refused", async () => {
+    expect((await putTrip({ ...entries[0], coverImage: "" })).status).toBe(412);
+    expect(await countCovers("sendai-2026")).toBe(1);
+  });
+
+  it("leaves the covers of other trips alone", async () => {
+    await upload("kyushu-2024", png, ALICE, "image/png");
+    expect((await putTrip({ ...entries[1], version: 1, coverImage: "" })).status).toBe(200);
+    expect(await countCovers("sendai-2026")).toBe(1);
+  });
+
   it("leaves other users' covers alone", async () => {
     const bobs: Trip = { ...trips[0], id: "bob-trip" };
-    expect((await api("/trips", { method: "PUT", body: [bobs], as: BOB })).status).toBe(200);
+    await insertTrips(BOB, [bobs]);
+    expect((await putTrip({ ...bobs, version: 0 }, BOB)).status).toBe(200);
     expect(await countCovers("sendai-2026")).toBe(1);
   });
 

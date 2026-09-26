@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { InfoItem, ItineraryDay, Shop, Trip } from "@travel-pocket/shared";
+import type { InfoItem, ItineraryDay, Shop, Trip, TripEntry } from "@travel-pocket/shared";
 import { conflictingTripsQuery, seedStatements, userIdQuery } from "../src/db/seed";
 import type { SeedData } from "../src/db/seed";
 import { toSqlText } from "../src/db/statements";
 import type { Statement } from "../src/db/statements";
-import { ALICE, BOB, api, resetDatabase } from "./helpers";
+import { ALICE, BOB, api, insertTrips, replace, resetDatabase } from "./helpers";
 
 // Values with quotes and newlines, to prove toSqlText's literals survive them.
 const trips: Trip[] = [
@@ -58,6 +58,8 @@ const info: InfoItem[] = [
   { id: "info-1", title: "緊急聯絡", icon: "phone", links: [{ label: "代表處", url: "https://example.com" }] },
 ];
 
+const entries: TripEntry[] = trips.map((trip) => ({ ...trip, version: 0 }));
+
 const data: SeedData = {
   trips,
   tripData: { "sendai-2026": { itinerary, shops, info }, "kyushu-2024": { shops: [] } },
@@ -104,7 +106,7 @@ describe("seedStatements", () => {
   it("imports everything into a new account the user later signs in to", async () => {
     await execAsText(seedStatements(crypto.randomUUID(), ALICE, data));
 
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(trips);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(entries);
     expect(await json(api("/trips/sendai-2026/itinerary", { as: ALICE }))).toStrictEqual(itinerary);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
     expect(await json(api("/trips/sendai-2026/info", { as: ALICE }))).toStrictEqual(info);
@@ -115,15 +117,28 @@ describe("seedStatements", () => {
     await api("/me", { as: ALICE });
     const [aliceId] = await ids(userIdQuery(ALICE));
     await execAsText(seedStatements(aliceId, ALICE, data));
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(trips);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(entries);
   });
 
   it("replaces instead of duplicating when run again", async () => {
     const ownerId = crypto.randomUUID();
     await execAsText(seedStatements(ownerId, ALICE, data));
     await execAsText(seedStatements(ownerId, ALICE, data));
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(trips);
+    const again = trips.map((trip) => ({ ...trip, version: 1 }));
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual(again);
     expect(await json(api("/trips/sendai-2026/shops", { as: ALICE }))).toStrictEqual(shops);
+  });
+
+  it("gives what it replaces a new version, so older copies cannot overwrite it", async () => {
+    const ownerId = crypto.randomUUID();
+    await execAsText(seedStatements(ownerId, ALICE, data));
+    const read = await api("/trips/sendai-2026/shops", { as: ALICE });
+    const etag = read.headers.get("ETag") ?? "";
+    await execAsText(seedStatements(ownerId, ALICE, data));
+    const headers = { "If-Match": etag };
+    const res = await api("/trips/sendai-2026/shops", { method: "PUT", body: [], as: ALICE, headers });
+    expect(res.status).toBe(412);
+    expect((await replace("/trips/sendai-2026/shops", [], ALICE)).status).toBe(200);
   });
 
   it("keeps the imported trips away from other users", async () => {
@@ -137,13 +152,13 @@ describe("conflictingTripsQuery", () => {
   const tripIds = trips.map((trip) => trip.id);
 
   it("finds ids that belong to another account", async () => {
-    await api("/trips", { method: "PUT", body: [trips[1]], as: BOB });
+    await insertTrips(BOB, [trips[1]]);
     expect(await ids(conflictingTripsQuery(ALICE, tripIds))).toEqual(["kyushu-2024"]);
     expect(await ids(conflictingTripsQuery("new@example.com", tripIds))).toEqual(["kyushu-2024"]);
   });
 
   it("does not count the account's own trips", async () => {
-    await api("/trips", { method: "PUT", body: trips, as: ALICE });
+    await insertTrips(ALICE, trips);
     expect(await ids(conflictingTripsQuery(ALICE, tripIds))).toEqual([]);
   });
 
