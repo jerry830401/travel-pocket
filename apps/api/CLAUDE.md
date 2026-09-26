@@ -31,6 +31,7 @@ Local setup: `db:migrate:local`, then `db:seed --owner dev@example.com` so the d
 - Locally there is no Access. The `dev` scripts pass `--var DEV_USER_EMAIL:dev@example.com`, and requests to `localhost` / `127.0.0.1` without a JWT act as that user. The var never applies to other hosts, and is never configured for a deployed Worker. To act as someone else locally, run `wrangler dev --var DEV_USER_EMAIL:<email>`.
 - The email (lowercased) identifies the user. The first request from a new email creates the `users` row (`ensureUser`).
 - Every route except `/health` requires a user (401 otherwise); sign-in is checked before the request is validated.
+- Cross-site writes are refused (#38). The Access cookie has no SameSite, so Safari and Firefox send it with a form another site posts here. Hono's `csrf()` runs before sign-in: a request other than `GET` / `HEAD` / `OPTIONS` whose `Content-Type` is one a form can send (urlencoded, multipart, `text/plain`) or missing must carry `Sec-Fetch-Site: same-origin` or an `Origin` equal to the request's, or it gets 403. Browsers add both on the app's own requests; JSON and image bodies are left to CORS, which never lets another site send them. When calling a local `wrangler dev` with curl, add `-H "Sec-Fetch-Site: same-origin"` to such writes (`POST /invites/:code`, `DELETE`s, …).
 
 ## API
 
@@ -88,7 +89,7 @@ A trip belongs to its owner (`trips.owner_id`); the owner shares it by handing o
 
 - Tests run inside workerd via `@cloudflare/vitest-plugin` (formerly `@cloudflare/vitest-pool-workers`), against a local D1.
 - `vitest.config.ts` reads `migrations/` into a `TEST_MIGRATIONS` binding; `test/apply-migrations.ts` applies them before tests. It also binds a test Access team and AUD, and `DEV_USER_EMAIL`.
-- `test/helpers.ts` plays Cloudflare Access: it generates an RSA key, serves the public key at the team's certs URL (by spying on `fetch`), and signs JWTs with `accessToken(email)`. `api(path, { as: email })` sends a signed-in request to a non-local host, so `DEV_USER_EMAIL` only applies when a test asks for a `localhost` origin.
+- `test/helpers.ts` plays Cloudflare Access: it generates an RSA key, serves the public key at the team's certs URL (by spying on `fetch`), and signs JWTs with `accessToken(email)`. `api(path, { as: email })` sends a signed-in request to a non-local host, so `DEV_USER_EMAIL` only applies when a test asks for a `localhost` origin. It sends `Sec-Fetch-Site: same-origin` like a browser; `site` changes it, and `site: null` leaves it out (the cross-site tests in `test/api.test.ts`).
 - Storage is isolated per test file, not per test: `resetDatabase()` in `beforeEach` deletes `users`, which cascades to everything else.
 - `insertTrips(email, trips)` gives a user trips under fixed ids straight in D1 (the API assigns ids itself); `replace(path, body, as)` PUTs a trip's list with the version a GET just answered; `ownEntry(trip, email)` is a trip as its owner lists it before anyone shares it.
 - `test/sharing.test.ts` covers invites, requests, approval, what members may and may not do, leaving and removal, with `ALICE` as the owner and `BOB` / `CAROL` asking to join.

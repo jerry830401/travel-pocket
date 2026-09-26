@@ -87,17 +87,31 @@ interface RequestOptions {
   headers?: Record<string, string>;
   /** Defaults to a non-local host, where DEV_USER_EMAIL never applies. */
   origin?: string;
+  /**
+   * `Sec-Fetch-Site`, which browsers send with every request; null leaves it
+   * out. Defaults to `same-origin`, like every request the app makes.
+   */
+  site?: string | null;
 }
 
 /** Strings and bytes are sent as they are; anything else as JSON. */
 export async function api(path: string, options: RequestOptions = {}): Promise<Response> {
-  const { method = "GET", body, as, token, headers = {}, origin = "https://api.test" } = options;
+  const {
+    method = "GET",
+    body,
+    as,
+    token,
+    headers = {},
+    origin = "https://api.test",
+    site = "same-origin",
+  } = options;
   const jwt = token ?? (as ? await accessToken(as) : undefined);
   const raw = body === undefined || typeof body === "string" || body instanceof Uint8Array;
   return exports.default.fetch(`${origin}/api${path}`, {
     method,
     headers: {
       ...(jwt ? { "Cf-Access-Jwt-Assertion": jwt } : {}),
+      ...(site !== null ? { "Sec-Fetch-Site": site } : {}),
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
       ...headers,
     },

@@ -1,7 +1,15 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ID_PATTERN } from "@travel-pocket/shared";
-import type { InfoItem, ItineraryDay, NewTrip, Shop, Trip, TripEntry } from "@travel-pocket/shared";
+import type {
+  InfoItem,
+  ItineraryDay,
+  NewTrip,
+  Shop,
+  Trip,
+  TripEntry,
+  TripInvite,
+} from "@travel-pocket/shared";
 import {
   ALICE,
   BOB,
@@ -597,5 +605,58 @@ describe("CORS", () => {
   it("lets allowed origins read the ETag", async () => {
     const res = await api("/health", { headers: { Origin: "http://localhost:5173" } });
     expect(res.headers.get("Access-Control-Expose-Headers")).toMatch(/ETag/i);
+  });
+});
+
+// Another site's form, posted with Bob's Access cookie, as browsers do.
+describe("cross-site requests", () => {
+  let code: string;
+
+  beforeEach(async () => {
+    await insertTrips(ALICE, [trips[0]]);
+    const invite = api(`/trips/${trips[0].id}/invite`, { method: "POST", as: ALICE });
+    code = (await json<TripInvite>(invite)).inviteCode;
+  });
+
+  function requestsToJoin() {
+    return env.DB.prepare("SELECT COUNT(*) AS n FROM trip_members").first<number>("n");
+  }
+
+  it.each([
+    ["from another site", { site: "cross-site" }],
+    ["from a sibling subdomain", { site: "same-site" }],
+    ["with another site's Origin", { site: null, headers: { Origin: "https://evil.example" } }],
+    ["that says nothing of where it comes from", { site: null }],
+  ])("refuses a request to join %s", async (_, options) => {
+    const res = await api(`/invites/${code}`, { method: "POST", as: BOB, ...options });
+    expect(res.status).toBe(403);
+    expect(await requestsToJoin()).toBe(0);
+  });
+
+  it("refuses a trip posted as text/plain, which a form can send", async () => {
+    const res = await api("/trips", {
+      method: "POST",
+      body: JSON.stringify(newTrip),
+      as: BOB,
+      site: "cross-site",
+      headers: { "Content-Type": "text/plain" },
+    });
+    expect(res.status).toBe(403);
+    expect(await json(api("/trips", { as: BOB }))).toEqual([]);
+  });
+
+  it.each([
+    ["Sec-Fetch-Site", { site: "same-origin" }],
+    ["Origin, without Sec-Fetch-Site", { site: null, headers: { Origin: "https://api.test" } }],
+  ])("lets the app's own requests through, told by %s", async (_, options) => {
+    const res = await api(`/invites/${code}`, { method: "POST", as: BOB, ...options });
+    expect(res.status).toBe(200);
+    expect(await requestsToJoin()).toBe(1);
+  });
+
+  // No form sends JSON, and fetch needs a preflight for it, which CORS refuses.
+  it("leaves JSON requests to CORS", async () => {
+    const res = await api("/trips", { method: "POST", body: newTrip, as: BOB, site: null });
+    expect(res.status).toBe(201);
   });
 });

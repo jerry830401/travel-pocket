@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
+import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
 import {
   DATA_TYPES,
@@ -64,6 +65,11 @@ app.use(
 
 // Registered before requireUser, so it answers without signing in.
 app.get("/health", (c) => c.json({ ok: true }));
+
+// The Access cookie has no SameSite, so browsers send it with a form another
+// site posts here. A write a form could make (a form content type, or none)
+// must come from this origin: 403 otherwise, before anything else runs.
+app.use("*", csrf());
 
 // Every other route acts as the signed-in user and sees only the trips they
 // own or were approved to share.
