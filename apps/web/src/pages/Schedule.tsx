@@ -448,7 +448,6 @@ const Schedule = () => {
                     onClick={() => setSelectedItem({ item, day: currentDay })}
                     className="cursor-pointer transition-all duration-200"
                     style={{
-                      position: "relative",
                       background: "var(--paper)",
                       border: "1px solid color-mix(in srgb, var(--rule) 55%, transparent)",
                       borderRadius: 10,
@@ -493,25 +492,23 @@ const Schedule = () => {
                         <span className="truncate">{item.location}</span>
                       </div>
                     </div>
-                    {/* Sticker */}
-                    <div
-                      className={`shrink-0 flex items-center justify-center font-hand font-bold ${cat.cls}`}
-                      style={{ width: 38, height: 38, borderRadius: "50%", fontSize: 18, transform: "rotate(-4deg)", boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,.5),0 1.5px 3px rgba(40,30,20,.18)" }}
-                    >
-                      {cat.g}
-                    </div>
-
-                    {/* Edit/delete buttons */}
-                    {canEdit && (
+                    {/* Edit/delete buttons left of the sticker, in the row, so
+                        a short card (no end time) cannot put them over it */}
+                    <div className="shrink-0 flex items-center gap-1">
+                      {canEdit && (
+                        <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                          <EditBtn onClick={(e) => openEdit(item, currentDay.id, e)} />
+                          <DeleteBtn onClick={(e) => handleDelete(item.id, currentDay.id, e)} />
+                        </div>
+                      )}
+                      {/* Sticker */}
                       <div
-                        className="absolute flex gap-0.5"
-                        style={{ top: 6, right: 6 }}
-                        onClick={(e) => e.stopPropagation()}
+                        className={`flex items-center justify-center font-hand font-bold ${cat.cls}`}
+                        style={{ width: 38, height: 38, borderRadius: "50%", fontSize: 18, transform: "rotate(-4deg)", boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,.5),0 1.5px 3px rgba(40,30,20,.18)" }}
                       >
-                        <EditBtn onClick={(e) => openEdit(item, currentDay.id, e)} />
-                        <DeleteBtn onClick={(e) => handleDelete(item.id, currentDay.id, e)} />
+                        {cat.g}
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* Gap pill */}
