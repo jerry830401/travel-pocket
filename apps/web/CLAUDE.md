@@ -26,7 +26,7 @@ pnpm -F @travel-pocket/web cf-typegen      # Regenerate worker/worker-configurat
 
 ## Routing
 
-Uses **HashRouter** (not BrowserRouter): every route is served by `index.html`, so the static assets need no fallback rules. Routes follow the pattern `/#/trip/{tripId}/schedule`, `/#/trip/{tripId}/shops`, `/#/trip/{tripId}/info`.
+Uses **HashRouter** (not BrowserRouter): every route is served by `index.html`, so the static assets need no fallback rules. Routes follow the pattern `/#/trip/{tripId}/schedule`, `/#/trip/{tripId}/shops`, `/#/trip/{tripId}/info`. `/#/settings` is the 設定 page (theme and account), reached only from the gear link in Home's header.
 
 `TripView.tsx` is the nested layout shell; it fetches trip data and passes it down to child routes via `useOutletContext`.
 
@@ -43,11 +43,11 @@ Pages never call `fetch` for trip data themselves; they go through `src/dataSour
   - 完成 saves the draft if it changed, shows a 「已儲存」 toast and returns to view mode. On failure it shows 「儲存失敗：…」 and stays in edit mode with the draft intact, so 完成 can be retried.
   - 取消 drops the draft (after a confirm when there are changes).
   - The trip pages save with one `saveTripData`. Home's `saveTripList` runs `deleteTrip` for removed trips, `createTrip` for trips added in the draft (placeholder ids start with `new:`, which never matches `ID_PATTERN`), then one `saveTrips` if anything else changed. It reports each step through `progress`, so a retry after a failure skips what already went through.
-  - Nothing is stored, so leaving the page drops the draft. To prevent that, editing locks navigation: Home disables the trip cards and 登出; the trip pages pass `lockNav` (`setNavLocked` from `TripOutletContext`), which disables `TripView`'s back link and tabs.
-- `EditControls` sits next to the theme button. Home renders it in its own header. The trip header belongs to `TripView`, so it passes `editSlot` (an element next to the theme button) through the outlet context, and each tab page portals its `EditControls` into it with `createPortal`.
+  - Nothing is stored, so leaving the page drops the draft. To prevent that, editing locks navigation: Home disables the trip cards and the 設定 link; the trip pages pass `lockNav` (`setNavLocked` from `TripOutletContext`), which disables `TripView`'s back link and tabs. Locked links use `lockedLink` (`src/components/lockedLink.ts`).
+- `EditControls` sits at the right of the header. Home renders it in its own header, next to the 設定 link. The trip header belongs to `TripView`, so it passes `editSlot` (an element at the right end of the header) through the outlet context, and each tab page portals its `EditControls` into it with `createPortal`.
 - Toasts come from `ToastProvider` (`src/contexts/ToastContext.tsx`, in `App.tsx`): `useToast().showToast(message, "success" | "error")`. One at a time, above the bottom nav; success is `role="status"`, error is `role="alert"`.
 - Writes: `saveTrips`, `saveTripData` (`PUT`), `createTrip` (`POST`, the server assigns the id) and `deleteTrip` (`DELETE`, which also removes the trip's itinerary, shops and info). All of them reject when there is no API.
-- `loadMe()` returns the signed-in `Me`, or null. `signOut()` clears the `trip-api` cache and goes to `/cdn-cgi/access/logout`. Home shows the email, and shows 登出 outside the dev server, which has no Access.
+- `loadMe()` returns the signed-in `Me`, or null. `signOut()` clears the `trip-api` cache and goes to `/cdn-cgi/access/logout`. The 設定 page (`src/pages/Settings.tsx`) shows the email, and shows 登出 outside the dev server, which has no Access.
 - Signed out: Access answers every request without a session by redirecting to its login page (which shows a 「Google」 button; instant authentication is off, so nobody is sent to Google without clicking). API calls use `redirect: "manual"`, so that redirect (or a 401) becomes a `SignInRequiredError` and notifies `onSignedOut` listeners instead of failing as a cross-origin fetch. `SignInGate` (around the routes in `App.tsx`) then replaces the app with a 「請先登入」 screen whose 前往登入 button reloads through the network (`goToSignIn`). Nothing redirects on its own. This covers the app opening from the service worker (after the session expired) and a session ending while the app is open.
 
 | Command | Data source | Editable |
@@ -83,7 +83,7 @@ Edits made in the browser go to the local D1, never back into `packages/data/`.
 
 ## Theming
 
-Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/writes `localStorage` and respects `prefers-color-scheme` as a default. All Tailwind dark variants use `dark:` prefix.
+Dark/light mode is class-based (`.dark` on `<html>`). The user picks 淺色, 深色 or 跟隨系統 on the 設定 page; no other page has a theme button. `ThemeContext.tsx` holds that `preference` (`light` / `dark` / `system`) and the resulting `theme`. `light` and `dark` are stored in `localStorage` (`theme`); `system`, the default, removes the key and follows `prefers-color-scheme`, including changes while the app is open. All Tailwind dark variants use `dark:` prefix.
 
 ## Key Libraries
 
@@ -101,7 +101,7 @@ Dark/light mode is class-based (`.dark` on `<html>`). `ThemeContext.tsx` reads/w
 
 - Vitest setup file is at `src/test/setup.ts` — patches `matchMedia` for jsdom and runs `cleanup` after each test
 - Unit tests run without `VITE_API_URL`, so page tests exercise the static path by spying on `globalThis.fetch`. `src/dataSource.test.ts` covers API mode with `vi.stubEnv` plus a fresh `import()` after `vi.resetModules()`, because `dataSource.ts` reads `import.meta.env` at load time
-- `src/pages/Home.account.test.tsx` covers Home as a signed-in user (account line, edit mode, add / edit / delete trip, a failed save and its retry, empty state, read-only data) by mocking `../dataSource` at the module boundary; `src/pages/tripPages.editMode.test.tsx` does the same for the edit mode of Schedule, Shops and Info. `src/components/editor/useEditSession.test.tsx` covers the draft, 取消, 完成 and the toasts on their own
+- `src/pages/Home.account.test.tsx` covers Home as a signed-in user (account line, edit mode, add / edit / delete trip, a failed save and its retry, empty state, read-only data) by mocking `../dataSource` at the module boundary; `src/pages/tripPages.editMode.test.tsx` does the same for the edit mode of Schedule, Shops and Info, and `src/pages/Settings.test.tsx` for the 設定 page (theme options, account, 登出). `src/components/editor/useEditSession.test.tsx` covers the draft, 取消, 完成 and the toasts on their own
 - Tests that check a toast wrap the page in `ToastProvider`; without it, `useToast()` is a no-op
 - E2E tests run against the dev server at `http://localhost:5173/`; Playwright starts it automatically via `webServer` in `playwright.config.ts`. That is web's own `pnpm dev` (static mode), so E2E never needs the API
 

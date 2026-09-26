@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { MemoryRouter, Routes, Route, useOutletContext } from "react-router-dom";
 import TripView, { type TripOutletContext } from "./TripView";
-import { ThemeProvider } from "../contexts/ThemeContext";
 import type { Trip } from "../types";
 
 const mockTrips: Trip[] = [
@@ -38,24 +36,20 @@ const LockingChild = () => {
 
 function renderAt(path: string, child = <MockChild />) {
   return render(
-    <ThemeProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/trip/:tripId" element={<TripView />}>
-            <Route path="schedule" element={child} />
-            <Route path="shops" element={child} />
-            <Route path="info" element={child} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    </ThemeProvider>
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/trip/:tripId" element={<TripView />}>
+          <Route path="schedule" element={child} />
+          <Route path="shops" element={child} />
+          <Route path="info" element={child} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
   );
 }
 
 describe("TripView", () => {
   beforeEach(() => {
-    localStorage.clear();
-    document.documentElement.classList.remove("dark");
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockTrips),
@@ -130,14 +124,10 @@ describe("TripView", () => {
     });
   });
 
-  it("分頁可把按鈕放進 header，位在主題按鈕左邊", async () => {
+  it("分頁可把按鈕放進 header", async () => {
     renderAt("/trip/trip-kyushu/schedule", <SlotChild />);
     const slotButton = await screen.findByRole("button", { name: "slot button" });
     expect(screen.getByRole("banner")).toContainElement(slotButton);
-    expect(
-      slotButton.compareDocumentPosition(screen.getByRole("button", { name: "切換主題" })) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
   });
 
   it("分頁在編輯模式時停用返回與底部分頁", async () => {
@@ -152,11 +142,10 @@ describe("TripView", () => {
     }
   });
 
-  it("主題切換按鈕可切換深色模式", async () => {
-    const user = userEvent.setup();
+  it("header 沒有主題與設定按鈕（在首頁的設定頁）", async () => {
     renderAt("/trip/trip-kyushu/schedule");
-    await waitFor(() => screen.getByRole("button", { name: "切換主題" }));
-    await user.click(screen.getByRole("button", { name: "切換主題" }));
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    const banner = await screen.findByRole("banner");
+    expect(within(banner).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(banner).queryByRole("link", { name: "設定" })).not.toBeInTheDocument();
   });
 });

@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { Outlet, useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import type { Trip } from "../types";
 import { loadTrips } from "../dataSource";
-import { useTheme } from "../contexts/ThemeContext";
+import { lockedLink } from "../components/lockedLink";
 
 /**
- * What the tab pages get from `useOutletContext`. `editSlot` is the spot next
- * to the theme button where each page portals its own EditControls, since only
- * the page knows whether its data is editable. A page in edit mode calls
+ * What the tab pages get from `useOutletContext`. `editSlot` is the spot at the
+ * right end of the header where each page portals its own EditControls, since
+ * only the page knows whether its data is editable. A page in edit mode calls
  * `setNavLocked(true)`, which disables the back link and the tabs so its
  * draft is not lost.
  */
@@ -17,22 +17,12 @@ export type TripOutletContext = {
   setNavLocked: (locked: boolean) => void;
 };
 
-/* Stops a link while a page is in edit mode. */
-function lockedLink(locked: boolean) {
-  return {
-    "aria-disabled": locked || undefined,
-    tabIndex: locked ? -1 : undefined,
-    onClick: (e: React.MouseEvent) => { if (locked) e.preventDefault(); },
-  };
-}
-
 const TripView = () => {
   const { tripId } = useParams();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [error, setError] = useState(false);
   const [editSlot, setEditSlot] = useState<HTMLElement | null>(null);
   const [navLocked, setNavLocked] = useState(false);
-  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -79,7 +69,6 @@ const TripView = () => {
             <div className="skeleton" style={{ height: 28, width: "55%", borderRadius: 4 }} />
             <div className="skeleton" style={{ height: 16, width: "40%", borderRadius: 4 }} />
           </div>
-          <div className="skeleton" style={{ width: 36, height: 36, borderRadius: "50%" }} />
         </div>
         <div className="flex-1 flex items-center justify-center font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.1rem" }}>
           載入中...
@@ -130,18 +119,6 @@ const TripView = () => {
         </div>
         {/* `contents`: no box of its own, so an empty slot adds no gap */}
         <div ref={setEditSlot} className="contents" />
-        <button
-          onClick={toggleTheme}
-          aria-label="切換主題"
-          className="shrink-0 flex items-center justify-center font-hand transition-all duration-150 hover:rotate-[-10deg]"
-          style={{
-            width: 36, height: 36, borderRadius: "50%",
-            border: "1.5px dashed var(--ink)",
-            background: "transparent", color: "var(--ink)", fontSize: 18,
-          }}
-        >
-          {theme === "dark" ? "☀" : "☾"}
-        </button>
       </header>
 
       {/* Content */}

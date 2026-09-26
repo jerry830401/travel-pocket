@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Home from "./Home";
-import { ThemeProvider } from "../contexts/ThemeContext";
 import { ToastProvider } from "../contexts/ToastContext";
 import * as dataSource from "../dataSource";
 import type { Trip } from "../types";
@@ -13,11 +12,9 @@ import type { Trip } from "../types";
 vi.mock("../dataSource", () => ({
   apiEnabled: true,
   loadTrips: vi.fn(),
-  loadMe: vi.fn(),
   saveTrips: vi.fn(),
   createTrip: vi.fn(),
   deleteTrip: vi.fn(),
-  signOut: vi.fn(),
 }));
 
 vi.mock("framer-motion", () => ({
@@ -52,11 +49,9 @@ const kyoto: Trip = { id: "srv-1", name: "京都", startDate: "2026-11-01", endD
 function renderHome() {
   return render(
     <MemoryRouter>
-      <ThemeProvider>
-        <ToastProvider>
-          <Home />
-        </ToastProvider>
-      </ThemeProvider>
+      <ToastProvider>
+        <Home />
+      </ToastProvider>
     </MemoryRouter>
   );
 }
@@ -91,7 +86,6 @@ async function addKyoto() {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  ds.loadMe.mockResolvedValue({ email: "alice@example.com" });
   ds.loadTrips.mockResolvedValue({ data: [tokyo, sendai], editable: true });
   ds.saveTrips.mockResolvedValue(undefined);
   ds.createTrip.mockResolvedValue(kyoto);
@@ -103,25 +97,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("帳號", () => {
-  it("顯示登入的 email；dev server 沒有 Access，不顯示登出", async () => {
-    renderHome();
-    expect(await screen.findByText("alice@example.com")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "登出" })).not.toBeInTheDocument();
-  });
-
-  it("正式 build 提供登出", async () => {
+describe("設定", () => {
+  it("header 只有設定入口，帳號與主題都在設定頁", async () => {
     vi.stubEnv("DEV", false);
     renderHome();
-    await userEvent.click(await screen.findByRole("button", { name: "登出" }));
-    expect(ds.signOut).toHaveBeenCalledOnce();
-  });
-
-  it("讀不到帳號時不顯示帳號列", async () => {
-    ds.loadMe.mockResolvedValue(null);
-    renderHome();
     await screen.findByText("東京春遊");
-    expect(screen.queryByText("alice@example.com")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "設定" })).toHaveAttribute("href", "/settings");
+    expect(screen.queryByRole("button", { name: "登出" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "切換主題" })).not.toBeInTheDocument();
   });
 });
 
@@ -129,9 +112,9 @@ describe("編輯模式", () => {
   it("預設為檢視，沒有編輯、刪除、新增按鈕", async () => {
     renderHome();
 
-    // The switch sits next to the theme button in the header.
+    // The switch sits next to the settings link in the header.
     const toggle = await screen.findByRole("button", { name: "編輯" });
-    expect(toggle.parentElement).toContainElement(screen.getByRole("button", { name: "切換主題" }));
+    expect(toggle.parentElement).toContainElement(screen.getByRole("link", { name: "設定" }));
     expect(screen.queryByTitle("編輯")).not.toBeInTheDocument();
     expect(screen.queryByTitle("刪除")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "新增旅程" })).not.toBeInTheDocument();
@@ -154,13 +137,15 @@ describe("編輯模式", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("編輯中不能打開旅程，也不能登出", async () => {
-    vi.stubEnv("DEV", false);
+  it("編輯中不能打開旅程，也不能進設定", async () => {
     renderHome();
 
     await startEditing();
     expect(card("東京春遊")).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("button", { name: "登出" })).toBeDisabled();
+    const settings = screen.getByRole("link", { name: "設定" });
+    expect(settings).toHaveAttribute("aria-disabled", "true");
+    // fireEvent returns false when the click was prevented.
+    expect(fireEvent.click(settings)).toBe(false);
   });
 });
 

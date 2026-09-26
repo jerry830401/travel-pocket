@@ -1,17 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Me, NewTrip, Trip } from "../types";
-import { useTheme } from "../contexts/ThemeContext";
-import {
-  apiEnabled,
-  createTrip,
-  deleteTrip,
-  loadMe,
-  loadTrips,
-  saveTrips,
-  signOut,
-} from "../dataSource";
+import type { NewTrip, Trip } from "../types";
+import { apiEnabled, createTrip, deleteTrip, loadTrips, saveTrips } from "../dataSource";
 import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
+import { lockedLink } from "../components/lockedLink";
 import { useEditSession, type SaveDraft } from "../components/editor/useEditSession";
 
 function seasonTag(startDate: string) {
@@ -96,10 +88,8 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
-  const { theme, toggleTheme } = useTheme();
   const [editable, setEditable] = useState(false);
   const canEdit = editable && editing && !session.saving;
-  const [me, setMe] = useState<Me | null>(null);
 
   /* Edit state */
   const [editTarget, setEditTarget] = useState<Trip | null>(null);
@@ -111,10 +101,6 @@ const Home = () => {
       .then(({ data, editable }) => { load(data); setEditable(editable); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   }, [retry]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    loadMe().then(setMe);
-  }, []);
 
   const openEdit = (trip: Trip, e: React.MouseEvent) => {
     e.preventDefault();
@@ -186,30 +172,6 @@ const Home = () => {
             <p className="font-hand italic mt-1" style={{ fontSize: "1.05rem", color: "var(--ink-soft)" }}>
               my little travel journal · 旅の記録
             </p>
-            {me && (
-              <p
-                className="font-mono flex items-center gap-2 mt-2"
-                style={{ fontSize: ".7rem", letterSpacing: ".04em", color: "var(--ink-soft)" }}
-              >
-                <span>{me.email}</span>
-                {/* Cloudflare Access handles sign-out; the dev server has no Access. */}
-                {!import.meta.env.DEV && (
-                  <button
-                    onClick={() => void signOut()}
-                    disabled={editing}
-                    className="font-hand font-bold"
-                    style={{
-                      border: "none", background: "transparent", padding: 0,
-                      color: "var(--red)", fontSize: ".95rem",
-                      cursor: editing ? "not-allowed" : "pointer",
-                      opacity: editing ? .35 : 1,
-                    }}
-                  >
-                    登出
-                  </button>
-                )}
-              </p>
-            )}
           </div>
           <div className="shrink-0 flex items-center gap-2">
             {editable && !loading && !error && (
@@ -221,18 +183,25 @@ const Home = () => {
                 onFinish={session.finish}
               />
             )}
-            <button
-              onClick={toggleTheme}
-              aria-label="切換主題"
-              className="shrink-0 flex items-center justify-center font-hand transition-all duration-150 hover:rotate-[-10deg]"
+            {/* Leaving the page would drop the draft, so edit mode stays here. */}
+            <Link
+              to="/settings"
+              aria-label="設定"
+              {...lockedLink(editing)}
+              className="shrink-0 flex items-center justify-center transition-all duration-150 hover:rotate-[-10deg]"
               style={{
                 width: 36, height: 36, borderRadius: "50%",
                 border: "1.5px dashed var(--ink)",
-                background: "transparent", color: "var(--ink)", fontSize: 18,
+                background: "transparent", color: "var(--ink)",
+                opacity: editing ? .35 : 1,
+                cursor: editing ? "not-allowed" : undefined,
               }}
             >
-              {theme === "dark" ? "☀" : "☾"}
-            </button>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </Link>
           </div>
         </div>
       </div>

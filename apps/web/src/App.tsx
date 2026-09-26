@@ -4,6 +4,7 @@ import TripView from "./pages/TripView";
 import Schedule from "./pages/Schedule";
 import Shops from "./pages/Shops";
 import Info from "./pages/Info";
+import Settings from "./pages/Settings";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { UpdatePrompt } from "./components/UpdatePrompt";
@@ -23,6 +24,7 @@ function App() {
               <SignInGate>
                 <Routes>
                   <Route path="/" element={<Home />} />
+                  <Route path="/settings" element={<Settings />} />
                   <Route path="/trip/:tripId" element={<TripView />}>
                     <Route index element={<Navigate to="schedule" replace />} />
                     <Route path="schedule" element={<Schedule />} />

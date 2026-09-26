@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Home from "./Home";
-import { ThemeProvider } from "../contexts/ThemeContext";
 import type { Trip } from "../types";
 
 const mockTrips: Trip[] = [
@@ -24,15 +22,11 @@ const mockTrips: Trip[] = [
 ];
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <MemoryRouter>
-    <ThemeProvider>{children}</ThemeProvider>
-  </MemoryRouter>
+  <MemoryRouter>{children}</MemoryRouter>
 );
 
 describe("Home", () => {
   beforeEach(() => {
-    localStorage.clear();
-    document.documentElement.classList.remove("dark");
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockTrips),
@@ -77,11 +71,8 @@ describe("Home", () => {
     });
   });
 
-  it("主題切換按鈕可切換深色模式", async () => {
-    const user = userEvent.setup();
+  it("設定按鈕連結到設定頁", () => {
     render(<Home />, { wrapper: Wrapper });
-    const btn = screen.getByRole("button", { name: "切換主題" });
-    await user.click(btn);
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(screen.getByRole("link", { name: "設定" })).toHaveAttribute("href", "/settings");
   });
 });
