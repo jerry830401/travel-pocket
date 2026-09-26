@@ -116,6 +116,17 @@ describe("API 模式", () => {
     });
   });
 
+  it("loadTripData 也讀得懂 Cloudflare 壓縮後的 weak ETag", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([], 200, { ETag: 'W/"7"' }));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.loadTripData("kyushu-2024", "shops")).resolves.toEqual({
+      data: [],
+      editable: true,
+      version: 7,
+    });
+  });
+
   it("loadTripData 從 API 讀取，並去掉 VITE_API_URL 結尾的斜線", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([]));
     const ds = await importDataSource({ VITE_API_URL: "https://api.example.com/api/" });
@@ -207,6 +218,14 @@ describe("API 模式", () => {
       body: JSON.stringify(data),
       redirect: "manual",
     });
+  });
+
+  it("saveTripData 回傳 weak ETag 裡的新版本", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ ok: true }, 200, { ETag: 'W/"9"' }));
+    const ds = await importDataSource(apiEnv);
+
+    // 9, not the 4 it falls back to without a version it can read.
+    await expect(ds.saveTripData("kyushu-2024", "shops", [], 3)).resolves.toBe(9);
   });
 
   it("別人先存過（412）時拋出 ConflictError", async () => {

@@ -60,10 +60,22 @@ export function versionTag(version: number): string {
   return `"${version}"`;
 }
 
-/** The version in an `ETag` / `If-Match` value, or null when there is none. */
+/**
+ * The version in an `If-Match` value, or null when there is none. Only a
+ * strong tag names one: `If-Match` compares strongly, so a weak tag never
+ * matches.
+ */
 export function parseVersionTag(tag: string | null | undefined): number | null {
   const match = /^"(\d+)"$/.exec(tag?.trim() ?? "");
   return match ? Number(match[1]) : null;
+}
+
+/**
+ * The version in an `ETag`, or null when there is none. Cloudflare weakens the
+ * `ETag` of every response it compresses, so `W/"<n>"` names version n too.
+ */
+export function parseETagVersion(tag: string | null | undefined): number | null {
+  return parseVersionTag(tag?.trim().replace(/^W\//, ""));
 }
 
 /*

@@ -1,4 +1,4 @@
-import { parseVersionTag, versionTag } from "@travel-pocket/shared";
+import { parseETagVersion, versionTag } from "@travel-pocket/shared";
 import type {
   CoverUpload,
   DataType,
@@ -106,7 +106,7 @@ async function load<T>(apiPath: string, staticPath: string): Promise<Loaded<T>> 
     return {
       data: (await res.json()) as T,
       editable: !res.headers.has(SW_CACHE_HEADER),
-      version: parseVersionTag(res.headers.get("ETag")),
+      version: parseETagVersion(res.headers.get("ETag")),
     };
   } catch (err) {
     // Only the dev server still serves the static JSON (from packages/data);
@@ -216,7 +216,7 @@ export async function saveTripData<T extends DataType>(
   version: number
 ): Promise<number> {
   const res = await send("PUT", `/trips/${tripId}/${type}`, data, version);
-  return parseVersionTag(res.headers.get("ETag")) ?? version + 1;
+  return parseETagVersion(res.headers.get("ETag")) ?? version + 1;
 }
 
 /** Who shares the trip; pending requests and the invite code only reach its owner. */
