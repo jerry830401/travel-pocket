@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { circleBtn } from "../circleBtn";
 
@@ -207,6 +208,70 @@ export function FieldTags({ label, value, onChange, placeholder }: FieldTagsProp
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value.split(",").map((t) => t.trim()).filter(Boolean))}
         style={inputStyle}
+      />
+    </div>
+  );
+}
+
+/* Image picker: previews `value` (an image URL, "" for none) and hands the
+   picked file to `onPick`; the page decides what to do with it. */
+interface FieldImageProps {
+  label: string;
+  value: string;
+  onPick: (file: File) => void;
+  onRemove: () => void;
+  /** The picked file is still being prepared. */
+  busy?: boolean;
+}
+
+const imageBtn: React.CSSProperties = {
+  padding: "6px 14px", borderRadius: 14,
+  border: "1.5px solid var(--ink)",
+  background: "transparent", color: "var(--ink)",
+  fontFamily: "inherit", fontSize: ".85rem", cursor: "pointer",
+};
+
+export function FieldImage({ label, value, onPick, onRemove, busy }: FieldImageProps) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <span style={labelStyle}>{label}</span>
+      <div
+        className="flex items-center justify-center overflow-hidden"
+        style={{ height: 170, borderRadius: 8, background: "var(--paper-2)", border: "1.5px dashed var(--rule)" }}
+      >
+        {value ? (
+          <img src={value} alt={`${label}預覽`} className="w-full h-full object-cover" />
+        ) : (
+          <span className="font-hand" style={{ fontSize: "1rem", color: "var(--ink-soft)" }}>還沒有圖片</span>
+        )}
+      </div>
+      <div className="flex gap-2 mt-2">
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          disabled={busy}
+          style={{ ...imageBtn, opacity: busy ? .5 : 1 }}
+        >
+          {busy ? "處理中…" : value ? "更換圖片" : "選擇圖片"}
+        </button>
+        {value && !busy && (
+          <button type="button" onClick={onRemove} style={{ ...imageBtn, borderColor: "var(--red)", color: "var(--red)" }}>
+            移除
+          </button>
+        )}
+      </div>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        hidden
+        aria-label={label}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = ""; // so picking the same file again still fires
+          if (file) onPick(file);
+        }}
       />
     </div>
   );

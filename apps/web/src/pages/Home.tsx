@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { NewTrip, Trip } from "../types";
-import { apiEnabled, createTrip, deleteTrip, loadTrips, saveTrips } from "../dataSource";
-import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
+import { apiEnabled, createTrip, deleteTrip, loadTrips, saveTrips, uploadCover } from "../dataSource";
+import { resizeImage } from "../resizeImage";
+import { EditModal, FieldInput, FieldImage, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
 import { lockedLink } from "../components/lockedLink";
 import { circleBtn } from "../components/circleBtn";
 import { BottomBar } from "../components/BottomBar";
@@ -31,10 +32,9 @@ type TripDraft = {
   startDate: string;
   endDate: string;
   coverImage: string;
-  snapshot: string;
 };
 
-const EMPTY_DRAFT: TripDraft = { name: "", startDate: "", endDate: "", coverImage: "", snapshot: "" };
+const EMPTY_DRAFT: TripDraft = { name: "", startDate: "", endDate: "", coverImage: "" };
 
 function tripToDraft(trip: Trip): TripDraft {
   return {
@@ -42,20 +42,21 @@ function tripToDraft(trip: Trip): TripDraft {
     startDate: trip.startDate,
     endDate: trip.endDate,
     coverImage: trip.coverImage,
-    snapshot: trip.snapshot ?? "",
   };
 }
 
 function draftToNewTrip(draft: TripDraft): NewTrip {
-  const trip: NewTrip = {
+  return {
     name: draft.name.trim(),
     startDate: draft.startDate,
     endDate: draft.endDate,
-    coverImage: draft.coverImage.trim(),
+    coverImage: draft.coverImage,
   };
-  if (draft.snapshot.trim()) trip.snapshot = draft.snapshot.trim();
-  return trip;
 }
+
+/* A cover picked in edit mode is shown from a blob: URL until 完成 uploads
+   it; the image itself waits in pendingCovers, keyed by that URL. */
+const isPendingCover = (coverImage: string) => coverImage.startsWith("blob:");
 
 /* A trip added in edit mode has a placeholder id until 完成 creates it; ':'
    never appears in a real id (ID_PATTERN). */
@@ -63,29 +64,45 @@ const NEW_ID = "new:";
 
 /**
  * Saves the trip list in the order the API needs: deletions first, then new
- * trips (the server assigns their ids), then one PUT for edits and order.
- * Each step is reported, so a retry after a failure skips what went through.
+ * trips (the server assigns their ids), then the picked covers, then one PUT
+ * for edits and order. Each step is reported, so a retry after a failure
+ * skips what went through.
  */
-const saveTripList: SaveDraft<Trip[]> = async (draft, saved, progress) => {
-  let s = saved;
-  let d = draft;
-  for (const trip of s.filter((t) => !d.some((x) => x.id === t.id))) {
-    await deleteTrip(trip.id);
-    s = s.filter((t) => t.id !== trip.id);
-    progress(s, d);
-  }
-  for (const trip of d.filter((t) => t.id.startsWith(NEW_ID))) {
-    const created = await createTrip(draftToNewTrip(tripToDraft(trip)));
-    s = [...s, created];
-    d = d.map((t) => (t.id === trip.id ? created : t));
-    progress(s, d);
-  }
-  if (JSON.stringify(s) !== JSON.stringify(d)) await saveTrips(d);
-  return d;
-};
+function makeSaveTripList(pendingCovers: Map<string, Blob>): SaveDraft<Trip[]> {
+  return async (draft, saved, progress) => {
+    let s = saved;
+    let d = draft;
+    for (const trip of s.filter((t) => !d.some((x) => x.id === t.id))) {
+      await deleteTrip(trip.id);
+      s = s.filter((t) => t.id !== trip.id);
+      progress(s, d);
+    }
+    for (const trip of d.filter((t) => t.id.startsWith(NEW_ID))) {
+      const fields = draftToNewTrip(tripToDraft(trip));
+      const pending = isPendingCover(fields.coverImage);
+      const created = await createTrip(pending ? { ...fields, coverImage: "" } : fields);
+      s = [...s, created];
+      // The picked cover stays in the draft for the upload below.
+      d = d.map((t) => (t.id === trip.id ? { ...created, coverImage: trip.coverImage } : t));
+      progress(s, d);
+    }
+    for (const trip of d.filter((t) => isPendingCover(t.coverImage))) {
+      const image = pendingCovers.get(trip.coverImage);
+      if (!image) throw new Error("找不到選取的封面圖");
+      // The API points the saved trip at the new cover by itself.
+      const coverImage = await uploadCover(trip.id, image);
+      s = s.map((t) => (t.id === trip.id ? { ...t, coverImage } : t));
+      d = d.map((t) => (t.id === trip.id ? { ...t, coverImage } : t));
+      progress(s, d);
+    }
+    if (JSON.stringify(s) !== JSON.stringify(d)) await saveTrips(d);
+    return d;
+  };
+}
 
 const Home = () => {
-  const session = useEditSession<Trip[]>([], saveTripList);
+  const [pendingCovers] = useState(() => new Map<string, Blob>());
+  const session = useEditSession<Trip[]>([], makeSaveTripList(pendingCovers));
   const { data: trips, setData: setTrips, load, editing } = session;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -97,6 +114,14 @@ const Home = () => {
   const [editTarget, setEditTarget] = useState<Trip | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<TripDraft>(EMPTY_DRAFT);
+  const [preparingCover, setPreparingCover] = useState(false);
+
+  // Once editing ends (saved or dropped), nothing shows the picked covers.
+  useEffect(() => {
+    if (editing) return;
+    for (const url of pendingCovers.keys()) URL.revokeObjectURL(url);
+    pendingCovers.clear();
+  }, [editing, pendingCovers]);
 
   useEffect(() => {
     loadTrips()
@@ -121,7 +146,22 @@ const Home = () => {
     setAdding(false);
   };
 
+  const pickCover = async (file: File) => {
+    setPreparingCover(true);
+    try {
+      const image = await resizeImage(file);
+      const url = URL.createObjectURL(image);
+      pendingCovers.set(url, image);
+      setDraft((d) => ({ ...d, coverImage: url }));
+    } catch {
+      alert("無法讀取這張圖片，請換一張試試");
+    } finally {
+      setPreparingCover(false);
+    }
+  };
+
   const handleSave = () => {
+    if (preparingCover) return;
     if (!draft.name.trim() || !draft.startDate || !draft.endDate) {
       alert("請填寫旅行名稱與日期");
       return;
@@ -130,7 +170,8 @@ const Home = () => {
       setTrips([...trips, { ...draftToNewTrip(draft), id: `${NEW_ID}${Date.now()}` }]);
     } else if (editTarget) {
       setTrips(trips.map((t) =>
-        t.id === editTarget.id ? { ...draftToNewTrip(draft), id: t.id } : t
+        // Same key order as the API's trips, so an unchanged trip compares equal.
+        t.id === editTarget.id ? { id: t.id, ...draftToNewTrip(draft) } : t
       ));
     }
     closeModal();
@@ -327,12 +368,22 @@ const Home = () => {
 
                 {/* Cover */}
                 <div className="relative overflow-hidden rounded-sm" style={{ height: 170 }}>
-                  <img
-                    src={trip.snapshot ? `${import.meta.env.BASE_URL}${trip.snapshot}` : trip.coverImage}
-                    alt={trip.name}
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
+                  {trip.coverImage ? (
+                    <img
+                      src={trip.coverImage}
+                      alt={trip.name}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      aria-hidden
+                      className="w-full h-full flex items-center justify-center"
+                      style={{ background: "var(--paper-2)", fontSize: "2.6rem" }}
+                    >
+                      🧳
+                    </div>
+                  )}
                   <div aria-hidden style={{
                     position: "absolute", inset: 0,
                     backgroundImage: "radial-gradient(rgba(255,255,255,.16) 1px,transparent 1px)",
@@ -399,8 +450,13 @@ const Home = () => {
             <FieldInput label="開始日期" value={draft.startDate} onChange={(v) => setDraft((d) => ({ ...d, startDate: v }))} type="date" />
             <FieldInput label="結束日期" value={draft.endDate} onChange={(v) => setDraft((d) => ({ ...d, endDate: v }))} type="date" />
           </div>
-          <FieldInput label="封面圖 URL" value={draft.coverImage} onChange={(v) => setDraft((d) => ({ ...d, coverImage: v }))} placeholder="https://..." type="url" />
-          <FieldInput label="快照圖路徑（選填）" value={draft.snapshot} onChange={(v) => setDraft((d) => ({ ...d, snapshot: v }))} placeholder="data/kyushu-2024/snapshot.jpg" />
+          <FieldImage
+            label="封面圖"
+            value={draft.coverImage}
+            onPick={pickCover}
+            onRemove={() => setDraft((d) => ({ ...d, coverImage: "" }))}
+            busy={preparingCover}
+          />
         </EditModal>
       )}
     </div>

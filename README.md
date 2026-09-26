@@ -120,8 +120,7 @@ pnpm workspace monorepo。`apps/*` 是各自獨立開發、測試、部署的應
   "name": "仙台",
   "startDate": "2026-03-14",
   "endDate": "2026-03-21",
-  "coverImage": "https://…",
-  "snapshot": "data/sendai-2026/snapshot.jpg"   // 選填
+  "coverImage": "/data/sendai-2026/snapshot.jpg"   // 封面圖 URL，"" 表示沒有；在 app 裡上傳的會是 /api/trips/{id}/cover?v=…
 }
 
 // itinerary.json — ItineraryDay[]

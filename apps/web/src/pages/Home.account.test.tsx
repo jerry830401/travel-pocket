@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import Home from "./Home";
 import { ToastProvider } from "../contexts/ToastContext";
 import * as dataSource from "../dataSource";
+import * as resize from "../resizeImage";
 import type { Trip } from "../types";
 
 // Home against a signed-in API: the data layer is mocked at its module
@@ -15,7 +16,11 @@ vi.mock("../dataSource", () => ({
   saveTrips: vi.fn(),
   createTrip: vi.fn(),
   deleteTrip: vi.fn(),
+  uploadCover: vi.fn(),
 }));
+
+// jsdom has no canvas, so picking a photo skips the real resizing.
+vi.mock("../resizeImage", () => ({ resizeImage: vi.fn() }));
 
 vi.mock("framer-motion", () => ({
   motion: {
@@ -27,6 +32,7 @@ vi.mock("framer-motion", () => ({
 }));
 
 const ds = vi.mocked(dataSource);
+const resizeImage = vi.mocked(resize.resizeImage);
 
 const tokyo: Trip = {
   id: "trip-tokyo",
@@ -45,6 +51,10 @@ const sendai: Trip = {
 };
 
 const kyoto: Trip = { id: "srv-1", name: "京都", startDate: "2026-11-01", endDate: "2026-11-03", coverImage: "" };
+
+const photo = new File(["photo"], "photo.jpg", { type: "image/jpeg" });
+const resized = new Blob(["small"], { type: "image/jpeg" });
+const uploadedUrl = (tripId: string) => `/api/trips/${tripId}/cover?v=1`;
 
 function renderHome() {
   return render(
@@ -74,13 +84,29 @@ async function finish() {
   await userEvent.click(screen.getByRole("button", { name: "完成" }));
 }
 
-/** Adds 京都 through the modal (only to the draft). */
-async function addKyoto() {
+/** Adds 京都 through the modal (only to the draft), with a cover when asked. */
+async function addKyoto({ withCover = false } = {}) {
   await userEvent.click(screen.getByRole("button", { name: "新增旅程" }));
   await userEvent.type(field("旅行名稱"), " 京都 ");
   await userEvent.type(field("開始日期"), "2026-11-01");
   await userEvent.type(field("結束日期"), "2026-11-03");
+  if (withCover) await pickCover();
   await userEvent.click(screen.getByRole("button", { name: "確定" }));
+}
+
+/** Picks the photo in the open modal and waits for its preview. */
+async function pickCover() {
+  await userEvent.upload(screen.getByLabelText("封面圖"), photo);
+  await waitFor(() =>
+    expect(screen.getByRole("img", { name: "封面圖預覽" })).toHaveAttribute(
+      "src",
+      expect.stringMatching(/^blob:/)
+    )
+  );
+}
+
+function coverOf(name: string): HTMLImageElement | null {
+  return within(card(name)).queryByRole("img", { name });
 }
 
 beforeEach(() => {
@@ -90,6 +116,13 @@ beforeEach(() => {
   ds.saveTrips.mockResolvedValue(undefined);
   ds.createTrip.mockResolvedValue(kyoto);
   ds.deleteTrip.mockResolvedValue(undefined);
+  ds.uploadCover.mockImplementation(async (tripId) => uploadedUrl(tripId));
+  resizeImage.mockResolvedValue(resized);
+  let blobs = 0;
+  Object.assign(URL, {
+    createObjectURL: vi.fn(() => `blob:cover-${++blobs}`),
+    revokeObjectURL: vi.fn(),
+  });
 });
 
 afterEach(() => {
@@ -300,5 +333,100 @@ describe("無法編輯的資料", () => {
     expect(screen.queryByTitle("編輯")).not.toBeInTheDocument();
     expect(screen.queryByTitle("刪除")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "新增旅程" })).not.toBeInTheDocument();
+  });
+});
+
+describe("封面圖", () => {
+  it("選圖後先預覽，完成時才上傳，不必另外更新清單", async () => {
+    renderHome();
+
+    await startEditing();
+    await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
+    await pickCover();
+    expect(resizeImage).toHaveBeenCalledWith(photo);
+    await userEvent.click(screen.getByRole("button", { name: "確定" }));
+    expect(coverOf("東京春遊")).toHaveAttribute("src", "blob:cover-1");
+    expect(ds.uploadCover).not.toHaveBeenCalled();
+
+    await finish();
+    expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
+    expect(ds.uploadCover).toHaveBeenCalledWith("trip-tokyo", resized);
+    expect(ds.saveTrips).not.toHaveBeenCalled();
+    expect(coverOf("東京春遊")).toHaveAttribute("src", uploadedUrl("trip-tokyo"));
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:cover-1");
+  });
+
+  it("新增旅程時選的封面，建立旅程後用新的 id 上傳", async () => {
+    renderHome();
+
+    await startEditing();
+    await addKyoto({ withCover: true });
+    await finish();
+
+    expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
+    expect(ds.createTrip).toHaveBeenCalledWith(expect.objectContaining({ name: "京都", coverImage: "" }));
+    expect(ds.uploadCover).toHaveBeenCalledWith("srv-1", resized);
+    expect(ds.saveTrips).not.toHaveBeenCalled();
+    expect(coverOf("京都")).toHaveAttribute("src", uploadedUrl("srv-1"));
+  });
+
+  it("上傳失敗時留在編輯模式，重試不重複建立旅程", async () => {
+    ds.uploadCover.mockRejectedValueOnce(new Error("Cover is too large"));
+    renderHome();
+
+    await startEditing();
+    await addKyoto({ withCover: true });
+    await finish();
+    expect(await screen.findByRole("alert")).toHaveTextContent("儲存失敗：Cover is too large");
+    expect(coverOf("京都")).toHaveAttribute("src", "blob:cover-1");
+
+    await finish();
+    expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
+    expect(ds.createTrip).toHaveBeenCalledOnce();
+    expect(ds.uploadCover).toHaveBeenCalledTimes(2);
+    expect(ds.uploadCover).toHaveBeenLastCalledWith("srv-1", resized);
+  });
+
+  it("移除封面後存成空字串，卡片顯示佔位", async () => {
+    renderHome();
+
+    await startEditing();
+    await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
+    await userEvent.click(screen.getByRole("button", { name: "移除" }));
+    expect(screen.getByText("還沒有圖片")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "確定" }));
+    expect(coverOf("東京春遊")).toBeNull();
+
+    await finish();
+    expect(ds.saveTrips).toHaveBeenCalledWith([{ ...tokyo, coverImage: "" }, sendai]);
+    expect(ds.uploadCover).not.toHaveBeenCalled();
+  });
+
+  it("讀不了的圖片會提示，封面維持原樣", async () => {
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    resizeImage.mockRejectedValueOnce(new Error("The source image cannot be decoded."));
+    renderHome();
+
+    await startEditing();
+    await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
+    await userEvent.upload(screen.getByLabelText("封面圖"), photo);
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith("無法讀取這張圖片，請換一張試試"));
+    expect(screen.getByRole("img", { name: "封面圖預覽" })).toHaveAttribute("src", "/cover1.jpg");
+  });
+
+  it("取消編輯時放掉選取的圖片", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderHome();
+
+    await startEditing();
+    await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
+    await pickCover();
+    await userEvent.click(screen.getByRole("button", { name: "確定" }));
+    await userEvent.click(screen.getByRole("button", { name: "取消" }));
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:cover-1");
+    expect(coverOf("東京春遊")).toHaveAttribute("src", "/cover1.jpg");
+    expect(ds.uploadCover).not.toHaveBeenCalled();
   });
 });
