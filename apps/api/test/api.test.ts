@@ -11,7 +11,6 @@ const trips: Trip[] = [
     startDate: "2026-03-01",
     endDate: "2026-03-08",
     coverImage: "https://example.com/sendai.jpg",
-    snapshot: "data/sendai-2026/snapshot.jpg",
   },
   {
     id: "kyushu-2024",
@@ -241,17 +240,16 @@ describe("POST /trips", () => {
     expect(await json(api("/trips", { as: BOB }))).toStrictEqual(trips);
   });
 
-  it("keeps the optional snapshot", async () => {
+  it("drops unknown fields, such as the old snapshot", async () => {
     const body = { ...newTrip, snapshot: "data/tokyo/snapshot.jpg" };
     const created = await json<Trip>(api("/trips", { method: "POST", body, as: ALICE }));
-    expect(created.snapshot).toBe("data/tokyo/snapshot.jpg");
+    expect(created).toStrictEqual({ ...newTrip, id: created.id });
     expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([created]);
   });
 
   it.each([
     ["a missing field", { ...newTrip, name: undefined }],
     ["a field of the wrong type", { ...newTrip, startDate: 20261001 }],
-    ["a snapshot of the wrong type", { ...newTrip, snapshot: 1 }],
     ["an array", [newTrip]],
     ["invalid JSON", "{not json"],
   ])("rejects a body with %s", async (_, body) => {

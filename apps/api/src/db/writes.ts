@@ -20,16 +20,15 @@ export function insertUserStatement(id: string, email: string): Statement {
 // `WHERE true` resolves SQLite's parsing ambiguity between SELECT and ON CONFLICT.
 export function upsertTripsStatement(ownerId: string, trips: readonly Trip[]): Statement {
   return {
-    sql: `INSERT INTO trips (id, owner_id, name, start_date, end_date, cover_image, snapshot, position)
+    sql: `INSERT INTO trips (id, owner_id, name, start_date, end_date, cover_image, position)
           SELECT value ->> 'id', ?2, value ->> 'name', value ->> 'startDate', value ->> 'endDate',
-                 value ->> 'coverImage', value ->> 'snapshot', key
+                 value ->> 'coverImage', key
           FROM json_each(?1) WHERE true
           ON CONFLICT (id) DO UPDATE SET
             name = excluded.name,
             start_date = excluded.start_date,
             end_date = excluded.end_date,
             cover_image = excluded.cover_image,
-            snapshot = excluded.snapshot,
             position = excluded.position
           WHERE trips.owner_id = excluded.owner_id`,
     params: [JSON.stringify(trips), ownerId],
@@ -39,24 +38,51 @@ export function upsertTripsStatement(ownerId: string, trips: readonly Trip[]): S
 /** Inserts a trip after the owner's last one. */
 export function insertTripStatement(ownerId: string, trip: Trip): Statement {
   return {
-    sql: `INSERT INTO trips (id, owner_id, name, start_date, end_date, cover_image, snapshot, position)
-          SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, COALESCE(MAX(position) + 1, 0)
+    sql: `INSERT INTO trips (id, owner_id, name, start_date, end_date, cover_image, position)
+          SELECT ?1, ?2, ?3, ?4, ?5, ?6, COALESCE(MAX(position) + 1, 0)
           FROM trips WHERE owner_id = ?2`,
-    params: [
-      trip.id,
-      ownerId,
-      trip.name,
-      trip.startDate,
-      trip.endDate,
-      trip.coverImage,
-      trip.snapshot ?? null,
-    ],
+    params: [trip.id, ownerId, trip.name, trip.startDate, trip.endDate, trip.coverImage],
   };
 }
 
-/** Deletes one of the owner's trips; its itinerary, shops and info cascade. */
+/** Deletes one of the owner's trips; its itinerary, shops, info and cover cascade. */
 export function deleteTripStatement(ownerId: string, tripId: string): Statement {
   return { sql: "DELETE FROM trips WHERE id = ?1 AND owner_id = ?2", params: [tripId, ownerId] };
+}
+
+/** Where the API serves a trip's uploaded cover (`GET /api/trips/:tripId/cover`). */
+export function coverPath(tripId: string): string {
+  return `/api/trips/${tripId}/cover`;
+}
+
+/** Stores a trip's cover and points the trip at `coverImage`. Run as one batch. */
+export function saveCoverStatements(
+  tripId: string,
+  contentType: string,
+  data: ArrayBuffer,
+  coverImage: string
+): Statement[] {
+  return [
+    {
+      sql: `INSERT INTO trip_covers (trip_id, content_type, data) VALUES (?1, ?2, ?3)
+            ON CONFLICT (trip_id) DO UPDATE SET
+              content_type = excluded.content_type,
+              data = excluded.data`,
+      params: [tripId, contentType, data],
+    },
+    { sql: "UPDATE trips SET cover_image = ?2 WHERE id = ?1", params: [tripId, coverImage] },
+  ];
+}
+
+// A cover is kept only while its trip's cover_image points at it (coverPath,
+// plus a version query). Saving a trip with another image, or none, drops it.
+export function deleteStaleCoversStatement(ownerId: string): Statement {
+  return {
+    sql: `DELETE FROM trip_covers WHERE trip_id IN (
+            SELECT id FROM trips
+            WHERE owner_id = ?1 AND cover_image NOT LIKE '/api/trips/' || id || '/cover%')`,
+    params: [ownerId],
+  };
 }
 
 // Deleting the days cascades to their items. Run as one batch (one transaction).

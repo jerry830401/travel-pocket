@@ -3,7 +3,12 @@ export interface Trip {
   name: string;
   startDate: string;
   endDate: string;
+  /**
+   * URL of the card image: an uploaded cover (`/api/trips/{id}/cover?v=…`),
+   * a static path, or "" for none.
+   */
   coverImage: string;
+  /** @deprecated Merged into `coverImage`; the API no longer stores it. */
   snapshot?: string;
 }
 

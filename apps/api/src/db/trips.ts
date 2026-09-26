@@ -1,6 +1,11 @@
 import type { NewTrip, Trip } from "@travel-pocket/shared";
-import { run } from "./run";
-import { deleteTripStatement, insertTripStatement, upsertTripsStatement } from "./writes";
+import { run, runBatch } from "./run";
+import {
+  deleteStaleCoversStatement,
+  deleteTripStatement,
+  insertTripStatement,
+  upsertTripsStatement,
+} from "./writes";
 
 export interface TripRow {
   id: string;
@@ -8,25 +13,22 @@ export interface TripRow {
   start_date: string;
   end_date: string;
   cover_image: string;
-  snapshot: string | null;
 }
 
 export function toTrip(row: TripRow): Trip {
-  const trip: Trip = {
+  return {
     id: row.id,
     name: row.name,
     startDate: row.start_date,
     endDate: row.end_date,
     coverImage: row.cover_image,
   };
-  if (row.snapshot !== null) trip.snapshot = row.snapshot;
-  return trip;
 }
 
 export async function listTrips(db: D1Database, ownerId: string): Promise<Trip[]> {
   const { results } = await db
     .prepare(
-      `SELECT id, name, start_date, end_date, cover_image, snapshot
+      `SELECT id, name, start_date, end_date, cover_image
        FROM trips WHERE owner_id = ? ORDER BY position`
     )
     .bind(ownerId)
@@ -57,12 +59,13 @@ export async function tripIdsOwnedByOthers(
   return results.map((row) => row.id);
 }
 
+/** Upserts the trips, then drops uploaded covers they no longer point at. */
 export async function upsertTrips(
   db: D1Database,
   ownerId: string,
   trips: readonly Trip[]
 ): Promise<void> {
-  await run(db, upsertTripsStatement(ownerId, trips));
+  await runBatch(db, [upsertTripsStatement(ownerId, trips), deleteStaleCoversStatement(ownerId)]);
 }
 
 /** Deletes the trip if it belongs to the owner; false when there was none to delete. */

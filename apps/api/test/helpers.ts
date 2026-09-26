@@ -81,9 +81,11 @@ interface RequestOptions {
   origin?: string;
 }
 
+/** Strings and bytes are sent as they are; anything else as JSON. */
 export async function api(path: string, options: RequestOptions = {}): Promise<Response> {
   const { method = "GET", body, as, token, headers = {}, origin = "https://api.test" } = options;
   const jwt = token ?? (as ? await accessToken(as) : undefined);
+  const raw = body === undefined || typeof body === "string" || body instanceof Uint8Array;
   return exports.default.fetch(`${origin}/api${path}`, {
     method,
     headers: {
@@ -91,12 +93,12 @@ export async function api(path: string, options: RequestOptions = {}): Promise<R
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
       ...headers,
     },
-    body: body === undefined || typeof body === "string" ? body : JSON.stringify(body),
+    body: raw ? body : JSON.stringify(body),
   });
 }
 
 export async function resetDatabase(): Promise<void> {
   // Storage is isolated per test file, not per test. Deleting users cascades
-  // to their trips, and from there to itinerary, shops and info.
+  // to their trips, and from there to itinerary, shops, info and covers.
   await env.DB.prepare("DELETE FROM users").run();
 }

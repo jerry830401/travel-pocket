@@ -1,19 +1,22 @@
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { DATA_TYPES, ID_PATTERN } from "@travel-pocket/shared";
-import type { DataType, Me, NewTrip, Trip } from "@travel-pocket/shared";
+import { DATA_TYPES, ID_PATTERN, MAX_COVER_BYTES } from "@travel-pocket/shared";
+import type { CoverUpload, DataType, Me, NewTrip, Trip } from "@travel-pocket/shared";
 import { requireUser, type AppEnv } from "./auth";
 import {
   createTrip,
   deleteTrip,
+  getCover,
   getTripData,
   listTrips,
   replaceTripData,
+  saveCover,
   tripIdsOwnedByOthers,
   tripOwnedBy,
   upsertTrips,
 } from "./db";
+import { detectImageType } from "./image";
 
 const app = new Hono<AppEnv>().basePath("/api");
 
@@ -43,10 +46,15 @@ function isDataType(value: string): value is DataType {
   return (DATA_TYPES as readonly string[]).includes(value);
 }
 
-function parseTripDataParams(c: Context<AppEnv>): { tripId: string; type: DataType } {
+function parseTripId(c: Context<AppEnv>): string {
   const tripId = c.req.param("tripId") ?? "";
-  const type = c.req.param("type") ?? "";
   if (!ID_PATTERN.test(tripId)) throw new HTTPException(400, { message: "Invalid tripId" });
+  return tripId;
+}
+
+function parseTripDataParams(c: Context<AppEnv>): { tripId: string; type: DataType } {
+  const tripId = parseTripId(c);
+  const type = c.req.param("type") ?? "";
   if (!isDataType(type)) throw new HTTPException(400, { message: "Invalid type" });
   return { tripId, type };
 }
@@ -84,17 +92,12 @@ function parseNewTrip(body: unknown): NewTrip {
       throw new HTTPException(400, { message: `${key} must be a string` });
     }
   }
-  if (fields.snapshot !== undefined && typeof fields.snapshot !== "string") {
-    throw new HTTPException(400, { message: "snapshot must be a string" });
-  }
-  const trip: NewTrip = {
+  return {
     name: fields.name as string,
     startDate: fields.startDate as string,
     endDate: fields.endDate as string,
     coverImage: fields.coverImage as string,
   };
-  if (typeof fields.snapshot === "string") trip.snapshot = fields.snapshot;
-  return trip;
 }
 
 // Another user's trip answers 404, exactly like a trip that does not exist.
@@ -133,6 +136,36 @@ app.delete("/trips/:tripId", async (c) => {
     throw new HTTPException(404, { message: "Trip not found" });
   }
   return c.json({ ok: true });
+});
+
+// Registered before /trips/:tripId/:type, which would take "cover" for a type.
+app.get("/trips/:tripId/cover", async (c) => {
+  const tripId = parseTripId(c);
+  await requireOwnTrip(c, tripId);
+  const cover = await getCover(c.env.DB, tripId);
+  if (!cover) throw new HTTPException(404, { message: "Trip has no cover" });
+  return c.body(cover.data, 200, {
+    "Content-Type": cover.contentType,
+    // Every upload gets a new URL (saveCover), so a cached copy never goes stale.
+    "Cache-Control": "private, max-age=31536000, immutable",
+    "X-Content-Type-Options": "nosniff",
+  });
+});
+
+// The body is the image itself. Its format is judged by its bytes, not by the
+// Content-Type header, and only JPEG, PNG and WebP are kept.
+app.put("/trips/:tripId/cover", async (c) => {
+  const tripId = parseTripId(c);
+  const tooLarge = () => new HTTPException(413, { message: "Cover is too large" });
+  if (Number(c.req.header("Content-Length")) > MAX_COVER_BYTES) throw tooLarge();
+  await requireOwnTrip(c, tripId);
+  const data = await c.req.arrayBuffer();
+  if (data.byteLength > MAX_COVER_BYTES) throw tooLarge();
+  const contentType = detectImageType(new Uint8Array(data));
+  if (!contentType) {
+    throw new HTTPException(400, { message: "Cover must be a JPEG, PNG or WebP image" });
+  }
+  return c.json<CoverUpload>({ coverImage: await saveCover(c.env.DB, tripId, contentType, data) });
 });
 
 app.get("/trips/:tripId/:type", async (c) => {

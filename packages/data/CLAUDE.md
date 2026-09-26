@@ -13,7 +13,7 @@ Plain JSON only — no code, no build step, no dependencies. The shapes are defi
 
 `tripId` must match `ID_PATTERN`, and the file names must be the values in `DATA_TYPES` (both in `packages/shared/src/contract.ts`). Consumers only pick up files that follow this layout.
 
-To add a new trip: add its folder here, populate the three JSON files, then add an entry to `trips.json`. Images such as `snapshot.jpg` are web-only assets and stay in `apps/web/public/data/{tripId}/`.
+To add a new trip: add its folder here, populate the three JSON files, then add an entry to `trips.json`. A trip's `coverImage` may point at a static image such as `/data/{tripId}/snapshot.jpg`; images are web-only assets and stay in `apps/web/public/data/{tripId}/`. Covers uploaded in the app live in the API's D1 instead.
 
 ## Consumers
 

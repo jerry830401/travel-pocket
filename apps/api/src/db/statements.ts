@@ -1,7 +1,8 @@
 // A SQL statement with numbered parameters (?1, ?2, …), kept free of D1 types
 // so scripts/seed.ts (Node) can share the exact SQL the Worker runs.
 
-export type SqlValue = string | number | null;
+/** An ArrayBuffer is stored as a BLOB. */
+export type SqlValue = string | number | null | ArrayBuffer;
 
 export interface Statement {
   sql: string;
@@ -14,6 +15,10 @@ function toLiteral(value: SqlValue | undefined): string {
   if (typeof value === "number") {
     if (!Number.isFinite(value)) throw new Error(`Cannot inline ${value} as SQL`);
     return String(value);
+  }
+  if (value instanceof ArrayBuffer) {
+    const hex = Array.from(new Uint8Array(value), (byte) => byte.toString(16).padStart(2, "0"));
+    return `X'${hex.join("")}'`;
   }
   return `'${value.replaceAll("'", "''")}'`;
 }
