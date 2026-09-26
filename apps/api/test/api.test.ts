@@ -194,6 +194,20 @@ describe("GET /trips", () => {
     expect(res.headers.get("Content-Type")).toMatch(/application\/json/);
     expect(await res.json()).toStrictEqual(entries);
   });
+
+  it("lists trips newest first by start date, then end date, whatever order they were added in", async () => {
+    const [sendai, kyushu] = trips;
+    const sendaiShort = { ...sendai, id: "sendai-short", endDate: "2026-03-03" };
+    const sameDates = { ...sendaiShort, id: "sendai-again" };
+    await insertTrips(ALICE, [kyushu, sendaiShort, sendai, sameDates]);
+    const listed = await json<TripEntry[]>(api("/trips", { as: ALICE }));
+    expect(listed.map((trip) => trip.id)).toEqual([
+      "sendai-2026",
+      "sendai-short",
+      "sendai-again",
+      "kyushu-2024",
+    ]);
+  });
 });
 
 describe("PUT /trips/:tripId", () => {
@@ -269,14 +283,14 @@ describe("PUT /trips/:tripId", () => {
 });
 
 describe("POST /trips", () => {
-  it("creates a trip under a server-assigned id, after the existing ones", async () => {
+  it("creates a trip under a server-assigned id, listed by its dates", async () => {
     await seedTrips();
     const res = await api("/trips", { method: "POST", body: newTrip, as: ALICE });
     expect(res.status).toBe(201);
     const created = await json<TripEntry>(res);
     expect(created).toStrictEqual(ownEntry({ ...newTrip, id: created.id }));
     expect(created.id).toMatch(ID_PATTERN);
-    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([...entries, created]);
+    expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([created, ...entries]);
   });
 
   it("starts a first trip for a new user", async () => {

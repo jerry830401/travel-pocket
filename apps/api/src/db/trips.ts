@@ -53,12 +53,17 @@ const ENTRY_SQL = `
   LEFT JOIN trip_members me ON me.trip_id = t.id AND me.user_id = ?1 AND me.status = 'member'
   WHERE (t.owner_id = ?1 OR me.user_id IS NOT NULL)`;
 
-/** The user's own trips in their order, then the ones they joined, in the order they asked. */
+/**
+ * The user's trips, newest first by start date, then end date. Trips on the
+ * same dates keep the old order: the user's own in their order, then the ones
+ * they joined, in the order they asked.
+ */
 export async function listTrips(db: D1Database, userId: string): Promise<TripEntry[]> {
   const { results } = await db
     .prepare(
       `${ENTRY_SQL}
-       ORDER BY me.user_id IS NOT NULL, CASE WHEN me.user_id IS NULL THEN t.position END,
+       ORDER BY t.start_date DESC, t.end_date DESC,
+                me.user_id IS NOT NULL, CASE WHEN me.user_id IS NULL THEN t.position END,
                 me.created_at`
     )
     .bind(userId)

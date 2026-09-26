@@ -42,7 +42,7 @@ A trip belongs to its owner (`trips.owner_id`); the owner shares it by handing o
 |---|---|
 | `GET /health` | `{ ok: true }`; no sign-in |
 | `GET /me` | `Me`: the signed-in user's email |
-| `GET /trips` | `TripEntry[]`: the user's own trips ordered by `position`, then the ones they joined, in the order they asked. Each has the `version` of its fields, the user's `role`, the `ownerEmail`, `memberCount` and (for the owner) `pendingCount` |
+| `GET /trips` | `TripEntry[]`: the trips the user owns or joined, newest first by `startDate`, then `endDate` (#36). Trips on the same dates keep the old order: the user's own by `position`, then the ones they joined, in the order they asked. Each has the `version` of its fields, the user's `role`, the `ownerEmail`, `memberCount` and (for the owner) `pendingCount` |
 | `POST /trips` | Creates a personal trip from a `NewTrip` under a server-assigned id, after the user's last trip; 201 with the `TripEntry` (version 0) |
 | `PUT /trips/:tripId` | Replaces the trip's fields with a `TripUpdate`, never its data, if `If-Match` names their current version; returns the `TripEntry` with the new version. Drops the trip's uploaded cover once `coverImage` no longer points at it. Owner or member |
 | `DELETE /trips/:tripId` | Deletes the trip; its itinerary, shops, info, cover and members cascade. Owner only |

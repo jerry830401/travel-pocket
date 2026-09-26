@@ -144,12 +144,15 @@ describe("a pending request", () => {
 describe("a member", () => {
   beforeEach(shareWithBob);
 
-  it("sees the trip as shared, after their own trips", async () => {
+  it("sees the trip as shared, among their own trips by date", async () => {
     const bobs: Trip = { ...sendai, id: "bob-trip", name: "Bob 的旅程" };
-    await insertTrips(BOB, [bobs]);
+    const earlier: Trip = { ...bobs, id: "bob-earlier", startDate: "2025-12-01", endDate: "2025-12-03" };
+    await insertTrips(BOB, [earlier, bobs]);
+    // On the same dates, their own trip comes first.
     expect(await json(api("/trips", { as: BOB }))).toStrictEqual([
       ownEntry(bobs, BOB),
       { ...ownEntry(sendai), role: "member", memberCount: 1 },
+      ownEntry(earlier, BOB),
     ]);
     expect(await json(api("/trips", { as: ALICE }))).toStrictEqual([
       { ...ownEntry(sendai), memberCount: 1 },
