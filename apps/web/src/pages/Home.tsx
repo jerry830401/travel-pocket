@@ -34,15 +34,41 @@ type TripDraft = {
   coverImage: string;
 };
 
-const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-  <h2
-    className="font-hand font-bold flex items-center gap-2.5 mb-4 mx-1"
-    style={{ fontSize: "1.15rem", color: "var(--red)" }}
-  >
-    <span style={{ display: "inline-block", width: 22, height: 2, background: "var(--red)", borderRadius: 1 }} />
-    {children}
-  </h2>
-);
+/** Newest first by start date, then end date; trips on the same dates keep the list's order. */
+const newestFirst = (a: Trip, b: Trip) =>
+  b.startDate.localeCompare(a.startDate) || b.endDate.localeCompare(a.endDate);
+
+type TripFilter = "all" | "personal" | "shared";
+
+const FILTERS: { value: TripFilter; label: string }[] = [
+  { value: "all", label: "全部" },
+  { value: "personal", label: "個人" },
+  { value: "shared", label: "共享" },
+];
+
+/* The filter is kept for the tab's session, so it survives opening a trip and
+   coming back; the app opens on 全部. */
+const FILTER_KEY = "home-filter";
+
+function readFilter(): TripFilter {
+  try {
+    const saved = sessionStorage.getItem(FILTER_KEY);
+    return FILTERS.find((f) => f.value === saved)?.value ?? "all";
+  } catch {
+    return "all";
+  }
+}
+
+function saveFilter(filter: TripFilter) {
+  try {
+    sessionStorage.setItem(FILTER_KEY, filter);
+  } catch {
+    // Not kept; 全部 comes back next time.
+  }
+}
+
+const matchesFilter = (trip: TripEntry, filter: TripFilter) =>
+  filter === "all" || (filter === "shared") === isShared(trip);
 
 const Hint = ({ children }: { children: React.ReactNode }) => (
   <p className="font-hand mx-1 mb-8" style={{ fontSize: "1rem", color: "var(--ink-soft)", lineHeight: 1.4 }}>
@@ -144,6 +170,13 @@ const Home = () => {
   const [error, setError] = useState(false);
   const [editable, setEditable] = useState(false);
   const canEdit = editable && editing && !session.saving;
+  // Only the API has shared trips, so the static JSON always shows 全部.
+  const [filter, setFilter] = useState<TripFilter>(() => (apiEnabled ? readFilter() : "all"));
+
+  const chooseFilter = (next: TripFilter) => {
+    setFilter(next);
+    saveFilter(next);
+  };
 
   /* Edit state */
   const [editTarget, setEditTarget] = useState<TripEntry | null>(null);
@@ -207,6 +240,8 @@ const Home = () => {
         id: `${NEW_ID}${Date.now()}`,
         version: 0, role: "owner", ownerEmail: "", memberCount: 0, pendingCount: 0,
       }]);
+      // A new trip is personal; 共享 would hide it.
+      if (filter === "shared") chooseFilter("all");
     } else if (editTarget) {
       setTrips(trips.map((t) => (t.id === editTarget.id ? { ...t, ...draftToNewTrip(draft) } : t)));
     }
@@ -221,7 +256,7 @@ const Home = () => {
     setTrips(trips.filter((t) => t.id !== trip.id));
   };
 
-  /** One trip's card; `i` alternates its tilt and washi tape within its section. */
+  /** One trip's card; `i` alternates its tilt and washi tape down the list. */
   const renderCard = (trip: TripEntry, i: number) => {
     const w = WASHI[i % WASHI.length];
     const baseRotate = i % 2 === 0 ? "rotate(-1.2deg)" : "rotate(1deg)";
@@ -349,8 +384,7 @@ const Home = () => {
     );
   };
 
-  const personal = trips.filter((trip) => !isShared(trip));
-  const shared = trips.filter(isShared);
+  const shown = trips.filter((trip) => matchesFilter(trip, filter)).sort(newestFirst);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -418,7 +452,32 @@ const Home = () => {
       <div className="flex-1 overflow-y-auto scrollbar-hide dot-grid-bg px-4 pb-8 pt-5">
         {apiEnabled && !loading && !error && !editable && <ReadOnlyBanner />}
 
-        <SectionLabel>個人旅程</SectionLabel>
+        {/* Filter: every trip, or only the personal or the shared ones */}
+        {apiEnabled && !loading && !error && trips.length > 0 && (
+          <div role="group" aria-label="篩選旅程" className="flex gap-2 mb-6 mx-1">
+            {FILTERS.map(({ value, label }) => {
+              const active = filter === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => chooseFilter(value)}
+                  className="font-hand font-bold"
+                  style={{
+                    padding: "3px 16px", borderRadius: 16,
+                    border: "1.5px solid var(--ink)",
+                    background: active ? "var(--ink)" : "transparent",
+                    color: active ? "var(--paper)" : "var(--ink)",
+                    fontSize: "1rem", cursor: "pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Error state */}
         {error && (
@@ -474,17 +533,14 @@ const Home = () => {
           </div>
         )}
 
-        {/* Trip cards: personal ones first, then the shared ones */}
-        {!loading && !error && personal.map(renderCard)}
-        {!loading && !error && trips.length > 0 && personal.length === 0 && <Hint>沒有個人旅程</Hint>}
-
-        {!loading && !error && trips.length > 0 && (apiEnabled || shared.length > 0) && (
-          <>
-            <SectionLabel>共享旅程</SectionLabel>
-            {shared.length > 0
-              ? shared.map(renderCard)
-              : <Hint>還沒有共享的旅程。打開旅程，按上方的 👥 邀請同行的人一起編輯。</Hint>}
-          </>
+        {/* Trip cards, newest first; shared ones say so on the card */}
+        {!loading && !error && shown.map(renderCard)}
+        {!loading && !error && trips.length > 0 && shown.length === 0 && (
+          <Hint>
+            {filter === "shared"
+              ? "還沒有共享的旅程。打開旅程，按上方的 👥 邀請同行的人一起編輯。"
+              : "沒有個人旅程"}
+          </Hint>
         )}
       </div>
 

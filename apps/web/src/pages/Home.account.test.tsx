@@ -136,6 +136,7 @@ function coverOf(name: string): HTMLImageElement | null {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  sessionStorage.clear();
   ds.loadTrips.mockResolvedValue({ data: [tokyo, sendai], editable: true, version: null });
   ds.updateTrip.mockImplementation(async (id, fields, version) => ({ ...OWN, id, ...fields, version: version + 1 }));
   ds.createTrip.mockResolvedValue(kyoto);
@@ -210,24 +211,37 @@ describe("編輯模式", () => {
   });
 });
 
-describe("個人與共享", () => {
-  const nara: TripEntry = { ...kyoto, id: "trip-nara", name: "奈良", role: "member", ownerEmail: "alice@example.com", memberCount: 2 };
+/** Checks that exactly these trips' cards are shown, top to bottom. */
+function expectCards(...names: string[]) {
+  const cards = screen.getAllByRole("link").filter((a) => a.getAttribute("href")?.startsWith("/trip/"));
+  expect(cards.map((a) => a.getAttribute("href"))).toEqual(
+    names.map((name) => card(name).getAttribute("href"))
+  );
+}
+
+function filterButton(name: "全部" | "個人" | "共享"): HTMLElement {
+  return within(screen.getByRole("group", { name: "篩選旅程" })).getByRole("button", { name });
+}
+
+describe("排序與篩選", () => {
+  const nara: TripEntry = {
+    ...kyoto, id: "trip-nara", name: "奈良", startDate: "2025-05-01", endDate: "2025-05-03",
+    role: "member", ownerEmail: "alice@example.com", memberCount: 2,
+  };
   const osaka: TripEntry = { ...kyoto, id: "trip-osaka", name: "大阪", memberCount: 1, pendingCount: 2 };
+  const sendaiLonger: TripEntry = { ...sendai, id: "trip-sendai-long", name: "仙台長住", endDate: "2024-08-20" };
 
-  /** Whether `a` comes before `b` on the page. */
-  const before = (a: HTMLElement, b: HTMLElement) =>
-    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-
-  it("沒有成員的旅程在個人區，自己分享的和別人分享給我的在共享區", async () => {
-    ds.loadTrips.mockResolvedValue({ data: [tokyo, osaka, nara], editable: true, version: null });
+  it("個人和共享的旅程一起依開始日期新到舊排列，同一天開始的依結束日期", async () => {
+    ds.loadTrips.mockResolvedValue({
+      data: [tokyo, osaka, sendai, nara, sendaiLonger],
+      editable: true,
+      version: null,
+    });
     renderHome();
 
-    const sharedHeading = await screen.findByRole("heading", { name: "共享旅程" });
-    const personalHeading = screen.getByRole("heading", { name: "個人旅程" });
-    expect(before(personalHeading, card("東京春遊"))).toBe(true);
-    expect(before(card("東京春遊"), sharedHeading)).toBe(true);
-    expect(before(sharedHeading, card("大阪"))).toBe(true);
-    expect(before(sharedHeading, card("奈良"))).toBe(true);
+    await screen.findByText("東京春遊");
+    expectCards("大阪", "奈良", "仙台長住", "仙台夏祭", "東京春遊");
+    expect(filterButton("全部")).toHaveAttribute("aria-pressed", "true");
 
     expect(within(card("奈良")).getByText("alice@example.com 分享")).toBeInTheDocument();
     expect(within(card("大阪")).getByText("與 1 人共享")).toBeInTheDocument();
@@ -235,9 +249,43 @@ describe("個人與共享", () => {
     expect(within(card("東京春遊")).queryByText(/共享|分享/)).not.toBeInTheDocument();
   });
 
-  it("還沒有共享的旅程時提示怎麼邀請", async () => {
+  it("篩選個人或共享只顯示那一種旅程", async () => {
+    ds.loadTrips.mockResolvedValue({ data: [tokyo, osaka, sendai, nara], editable: true, version: null });
     renderHome();
-    expect(await screen.findByText(/還沒有共享的旅程/)).toBeInTheDocument();
+    await screen.findByText("東京春遊");
+
+    await userEvent.click(filterButton("個人"));
+    expect(filterButton("個人")).toHaveAttribute("aria-pressed", "true");
+    expect(filterButton("全部")).toHaveAttribute("aria-pressed", "false");
+    expectCards("仙台夏祭", "東京春遊");
+
+    await userEvent.click(filterButton("共享"));
+    expectCards("大阪", "奈良");
+
+    await userEvent.click(filterButton("全部"));
+    expectCards("大阪", "奈良", "仙台夏祭", "東京春遊");
+  });
+
+  it("回到首頁時保留篩選", async () => {
+    ds.loadTrips.mockResolvedValue({ data: [tokyo, nara], editable: true, version: null });
+    const { unmount } = renderHome();
+    await screen.findByText("東京春遊");
+    await userEvent.click(filterButton("共享"));
+    unmount();
+
+    renderHome();
+    await screen.findByText("奈良");
+    expect(filterButton("共享")).toHaveAttribute("aria-pressed", "true");
+    expectCards("奈良");
+  });
+
+  it("還沒有共享的旅程時，共享篩選提示怎麼邀請", async () => {
+    renderHome();
+    await screen.findByText("東京春遊");
+    expect(screen.queryByText(/還沒有共享的旅程/)).not.toBeInTheDocument();
+
+    await userEvent.click(filterButton("共享"));
+    expect(screen.getByText(/還沒有共享的旅程/)).toBeInTheDocument();
   });
 
   it("別人分享給我的旅程可以編輯，但不能刪除", async () => {
@@ -247,7 +295,37 @@ describe("個人與共享", () => {
     await startEditing();
     expect(within(card("奈良")).getByTitle("編輯")).toBeInTheDocument();
     expect(within(card("奈良")).queryByTitle("刪除")).not.toBeInTheDocument();
+
+    await userEvent.click(filterButton("個人"));
     expect(screen.getByText("沒有個人旅程")).toBeInTheDocument();
+  });
+
+  it("在共享篩選下新增旅程時切回全部，新的旅程看得到", async () => {
+    ds.loadTrips.mockResolvedValue({ data: [tokyo, nara], editable: true, version: null });
+    renderHome();
+    await screen.findByText("東京春遊");
+    await userEvent.click(filterButton("共享"));
+
+    await startEditing();
+    await addKyoto();
+    expect(filterButton("全部")).toHaveAttribute("aria-pressed", "true");
+    expectCards("京都", "奈良", "東京春遊");
+  });
+
+  it("改了日期的旅程馬上移到對應的位置", async () => {
+    renderHome();
+    await screen.findByText("東京春遊");
+    expectCards("仙台夏祭", "東京春遊");
+
+    await startEditing();
+    await userEvent.click(within(card("東京春遊")).getByTitle("編輯"));
+    await userEvent.clear(field("開始日期"));
+    await userEvent.type(field("開始日期"), "2025-03-10");
+    await userEvent.clear(field("結束日期"));
+    await userEvent.type(field("結束日期"), "2025-03-16");
+    await userEvent.click(screen.getByRole("button", { name: "確定" }));
+
+    expectCards("東京春遊", "仙台夏祭");
   });
 });
 
@@ -278,9 +356,8 @@ describe("新增旅程", () => {
       coverImage: "",
     });
     expect(await screen.findByRole("status")).toHaveTextContent("已儲存");
-    const names = screen.getAllByText(/東京春遊|仙台夏祭|京都/).map((el) => el.textContent);
-    expect(names).toEqual(["東京春遊", "仙台夏祭", "京都"]);
     expect(card("京都")).toHaveAttribute("href", "/trip/srv-1");
+    expectCards("京都", "仙台夏祭", "東京春遊");
   });
 
   it("缺少名稱或日期時不加入", async () => {

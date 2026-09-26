@@ -99,7 +99,7 @@ const Join = () => {
 
               {invite.status === "none" && (
                 <>
-                  <p style={note}>擁有者同意後，這趟旅程會出現在你首頁的「共享旅程」，你們可以一起編輯。</p>
+                  <p style={note}>擁有者同意後，這趟旅程會出現在你的首頁，你們可以一起編輯。</p>
                   <button
                     onClick={() => void join()}
                     disabled={busy}

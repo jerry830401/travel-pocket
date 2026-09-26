@@ -53,6 +53,14 @@ describe("Home", () => {
     });
   });
 
+  it("依開始日期新到舊排列，沒有個人／共享的篩選", async () => {
+    render(<Home />, { wrapper: Wrapper });
+    await screen.findByText("東京春遊");
+    const names = screen.getAllByText(/東京春遊|仙台夏祭/).map((el) => el.textContent);
+    expect(names).toEqual(["仙台夏祭", "東京春遊"]);
+    expect(screen.queryByRole("group", { name: "篩選旅程" })).not.toBeInTheDocument();
+  });
+
   it("春季旅行顯示 ❄ 春 標籤", async () => {
     render(<Home />, { wrapper: Wrapper });
     await waitFor(() => expect(screen.getByText("❄ 春")).toBeInTheDocument());
