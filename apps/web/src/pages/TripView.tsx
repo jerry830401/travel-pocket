@@ -3,17 +3,21 @@ import { Outlet, useParams, Link, useLocation, useNavigate } from "react-router-
 import type { Trip } from "../types";
 import { loadTrips } from "../dataSource";
 import { lockedLink } from "../components/lockedLink";
+import { circleBtn } from "../components/circleBtn";
+import { BottomBar } from "../components/BottomBar";
 
 /**
  * What the tab pages get from `useOutletContext`. `editSlot` is the spot at the
  * right end of the header where each page portals its own EditControls, since
- * only the page knows whether its data is editable. A page in edit mode calls
- * `setNavLocked(true)`, which disables the back link and the tabs so its
- * draft is not lost.
+ * only the page knows whether its data is editable; `actionSlot` is the bottom
+ * bar, where it portals its add buttons while editing. A page in edit mode
+ * calls `setNavLocked(true)`, which disables the back link and puts
+ * `actionSlot` in place of the tabs, so its draft is not lost.
  */
 export type TripOutletContext = {
   trip: Trip;
   editSlot: HTMLElement | null;
+  actionSlot: HTMLElement | null;
   setNavLocked: (locked: boolean) => void;
 };
 
@@ -22,6 +26,7 @@ const TripView = () => {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [error, setError] = useState(false);
   const [editSlot, setEditSlot] = useState<HTMLElement | null>(null);
+  const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
   const [navLocked, setNavLocked] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -92,11 +97,9 @@ const TripView = () => {
         <Link
           to="/"
           {...lockedLink(navLocked)}
-          className="shrink-0 flex items-center justify-center font-hand transition-all duration-150"
+          className="font-hand transition-all duration-150"
           style={{
-            width: 34, height: 34, borderRadius: "50%",
-            border: "1.5px solid var(--ink)",
-            background: "transparent", color: "var(--ink)", fontSize: 22,
+            ...circleBtn, fontSize: 22,
             textDecoration: "none",
             opacity: navLocked ? .35 : 1,
             cursor: navLocked ? "not-allowed" : undefined,
@@ -123,43 +126,40 @@ const TripView = () => {
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto scrollbar-hide overscroll-y-contain">
-        <Outlet context={{ trip, editSlot, setNavLocked } satisfies TripOutletContext} />
+        <Outlet context={{ trip, editSlot, actionSlot, setNavLocked } satisfies TripOutletContext} />
       </main>
 
-      {/* Bottom nav */}
-      <nav
-        className="shrink-0 flex justify-around px-2 pb-3 pt-2.5 z-30"
-        style={{
-          background: "var(--paper)", borderTop: "1.5px dashed var(--rule)",
-          opacity: navLocked ? .35 : 1,
-        }}
-      >
-        {tabs.map((t) => {
-          const isActive = activeTab === t.key;
-          return (
-            <Link
-              key={t.key}
-              to={`/trip/${tripId}/${t.key}`}
-              {...lockedLink(navLocked)}
-              className="font-hand font-bold transition-all duration-150"
-              style={{
-                background: isActive ? "var(--ink)" : "transparent",
-                color: isActive ? "var(--paper)" : "var(--ink)",
-                padding: "5px 16px",
-                borderRadius: 16,
-                fontSize: "1.15rem",
-                transform: isActive ? "rotate(-1.5deg)" : "none",
-                boxShadow: isActive ? "2px 2px 0 var(--rule)" : "none",
-                textDecoration: "none",
-                border: "none",
-                cursor: navLocked ? "not-allowed" : undefined,
-              }}
-            >
-              {t.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Bottom bar: the tabs, or the page's add buttons while it is editing */}
+      <BottomBar>
+        {!navLocked && (
+          <nav className="flex-1 flex justify-around">
+            {tabs.map((t) => {
+              const isActive = activeTab === t.key;
+              return (
+                <Link
+                  key={t.key}
+                  to={`/trip/${tripId}/${t.key}`}
+                  className="font-hand font-bold transition-all duration-150"
+                  style={{
+                    background: isActive ? "var(--ink)" : "transparent",
+                    color: isActive ? "var(--paper)" : "var(--ink)",
+                    padding: "5px 16px",
+                    borderRadius: 16,
+                    fontSize: "1.15rem",
+                    transform: isActive ? "rotate(-1.5deg)" : "none",
+                    boxShadow: isActive ? "2px 2px 0 var(--rule)" : "none",
+                    textDecoration: "none",
+                    border: "none",
+                  }}
+                >
+                  {t.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
+        <div ref={setActionSlot} className={navLocked ? "flex-1 flex justify-center gap-3" : "hidden"} />
+      </BottomBar>
     </div>
   );
 };

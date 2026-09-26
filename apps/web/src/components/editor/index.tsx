@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { circleBtn } from "../circleBtn";
 
 /* ── Modal wrapper ──────────────────────────────────────────────── */
 
@@ -255,22 +256,29 @@ export function DeleteBtn({ onClick }: { onClick: (e: React.MouseEvent) => void 
 interface AddBtnProps {
   onClick: () => void;
   label?: string;
+  /** The bigger one for the bottom bar (see BottomBar), sharing the row with the others. */
+  bar?: boolean;
 }
 
-export function AddBtn({ onClick, label }: AddBtnProps) {
+const addBtnBar: React.CSSProperties = {
+  flex: 1, maxWidth: 200, height: 38, borderRadius: 19, fontSize: "1.1rem",
+};
+
+export function AddBtn({ onClick, label, bar }: AddBtnProps) {
   return (
     <button
       onClick={onClick}
-      className="font-hand font-bold flex items-center gap-1.5"
+      className="font-hand font-bold flex items-center justify-center gap-1.5"
       style={{
         padding: "5px 14px", borderRadius: 14,
         border: "1.5px dashed var(--ink)",
         background: "transparent", color: "var(--ink)",
         fontSize: ".9rem", cursor: "pointer",
         transition: "opacity .15s",
+        ...(bar && addBtnBar),
       }}
     >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <svg width={bar ? 15 : 13} height={bar ? 15 : 13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
       {label ?? "新增"}
@@ -278,8 +286,10 @@ export function AddBtn({ onClick, label }: AddBtnProps) {
   );
 }
 
-/* Edit-mode controls, next to the theme button: 編輯 in view mode; 取消 and
-   完成 while editing (see useEditSession). */
+/* Edit-mode controls at the right of the header, round like the header's
+   other buttons: 編輯 in view mode; 取消 and 完成 while editing (see
+   useEditSession). The names are aria-labels, not titles: the cards'
+   EditBtn is found by its title "編輯". */
 interface EditControlsProps {
   editing: boolean;
   saving: boolean;
@@ -288,55 +298,33 @@ interface EditControlsProps {
   onFinish: () => void;
 }
 
-const pillBtn: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 6,
-  padding: "4px 12px", borderRadius: 14,
-  border: "1.5px solid var(--ink)",
-  fontSize: ".9rem", cursor: "pointer", whiteSpace: "nowrap",
-};
-
 export function EditControls({ editing, saving, onStart, onCancel, onFinish }: EditControlsProps) {
   if (!editing) {
     return (
-      <button
-        onClick={onStart}
-        className="font-hand font-bold shrink-0"
-        style={{ ...pillBtn, background: "transparent", color: "var(--ink)" }}
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <button onClick={onStart} aria-label="編輯" style={{ ...circleBtn, cursor: "pointer" }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
-        編輯
       </button>
     );
   }
+  const busy: React.CSSProperties = { cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .5 : 1 };
   return (
-    <div className="flex items-center gap-1 shrink-0">
-      <button
-        onClick={onCancel}
-        disabled={saving}
-        className="font-hand font-bold"
-        style={{
-          border: "none", background: "transparent", color: "var(--ink-soft)",
-          padding: "4px 8px", fontSize: ".9rem", whiteSpace: "nowrap",
-          cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .5 : 1,
-        }}
-      >
-        取消
+    <div className="flex items-center gap-2 shrink-0">
+      <button onClick={onCancel} disabled={saving} aria-label="取消" style={{ ...circleBtn, ...busy }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+        </svg>
       </button>
       <button
         onClick={onFinish}
         disabled={saving}
-        className="font-hand font-bold"
-        style={{
-          ...pillBtn, background: "var(--ink)", color: "var(--paper)",
-          cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .6 : 1,
-        }}
+        aria-label={saving ? "儲存中…" : "完成"}
+        style={{ ...circleBtn, background: "var(--ink)", color: "var(--paper)", ...busy }}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <polyline points="20 6 9 17 4 12"/>
         </svg>
-        {saving ? "儲存中…" : "完成"}
       </button>
     </div>
   );

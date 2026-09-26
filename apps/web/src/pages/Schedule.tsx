@@ -121,7 +121,7 @@ function nextDateStr(dateStr: string): string {
 /* ─────────────────────────────────────────────────────────────── */
 
 const Schedule = () => {
-  const { trip, editSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const { trip, editSlot, actionSlot, setNavLocked } = useOutletContext<TripOutletContext>();
   const session = useEditSession<ItineraryDay[]>(
     [],
     async (next) => {
@@ -320,6 +320,14 @@ const Schedule = () => {
         editSlot
       )}
 
+      {canEdit && actionSlot && createPortal(
+        <>
+          {currentDay && <AddBtn onClick={() => openAdd(currentDay.id)} label="新增行程" bar />}
+          <AddBtn onClick={openAddDay} label="新增日" bar />
+        </>,
+        actionSlot
+      )}
+
       {/* Day bar */}
       <div
         className="sticky top-0 z-10 flex items-center"
@@ -357,9 +365,6 @@ const Schedule = () => {
           }
         </div>
         <div className="flex items-center gap-1.5 shrink-0 pr-3">
-          {canEdit && !loading && (
-            <AddBtn onClick={openAddDay} label="新增日" />
-          )}
           {!loading && todayIdx >= 0 && todayIdx !== dayIdx && (
             <button
               onClick={() => goToDay(todayIdx)}
@@ -530,13 +535,6 @@ const Schedule = () => {
                 </div>
               );
             })}
-
-            {/* Add item button */}
-            {canEdit && currentDay && (
-              <div className="flex justify-center pt-2 pb-1">
-                <AddBtn onClick={() => openAdd(currentDay.id)} label="新增行程" />
-              </div>
-            )}
           </motion.div>
         </AnimatePresence>
       )}

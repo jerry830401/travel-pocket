@@ -73,15 +73,18 @@ const pages = [
   { name: "資訊", Page: Info, type: "info", addLabel: "新增類別", removed: "交通" },
 ] as const;
 
-// Stands in for TripView's header slot, where each page portals its EditControls.
+// Stand in for TripView's slots: the header, where each page portals its
+// EditControls, and the bottom bar, where it portals its add buttons.
 let editSlot: HTMLElement;
+let actionSlot: HTMLElement;
 const setNavLocked = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   editSlot = document.body.appendChild(document.createElement("div"));
-  vi.mocked(useOutletContext).mockReturnValue({ trip, editSlot, setNavLocked });
+  actionSlot = document.body.appendChild(document.createElement("div"));
+  vi.mocked(useOutletContext).mockReturnValue({ trip, editSlot, actionSlot, setNavLocked });
   ds.loadTripData.mockImplementation(loaded(true));
   ds.saveTripData.mockResolvedValue(undefined);
   vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -89,6 +92,7 @@ beforeEach(() => {
 
 afterEach(() => {
   editSlot.remove();
+  actionSlot.remove();
   vi.restoreAllMocks();
 });
 
@@ -140,7 +144,7 @@ describe.each(pages)("$name 編輯模式", ({ Page, type, addLabel, removed }) =
     await startEditing();
     expect(screen.getAllByTitle("編輯").length).toBeGreaterThan(0);
     expect(screen.getAllByTitle("刪除").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: addLabel })).toBeInTheDocument();
+    expect(actionSlot).toContainElement(screen.getByRole("button", { name: addLabel }));
     expect(editSlot).toContainElement(screen.getByRole("button", { name: "取消" }));
     expect(setNavLocked).toHaveBeenLastCalledWith(true);
 
@@ -223,6 +227,7 @@ describe("日程：取消草稿中新增的日", () => {
     renderWithProviders(Schedule);
 
     await userEvent.click(await screen.findByRole("button", { name: "編輯" }));
+    expect(actionSlot).toContainElement(screen.getByRole("button", { name: "新增日" }));
     await userEvent.click(screen.getByRole("button", { name: "新增日" }));
     // The modal fills in the next date and day number.
     await userEvent.click(screen.getByRole("button", { name: "確定" }));

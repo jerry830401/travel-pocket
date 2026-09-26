@@ -25,7 +25,7 @@ type ItemDraft = { title: string; icon: string };
 type LinkDraft = { label: string; url: string };
 
 const Info = () => {
-  const { trip, editSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const { trip, editSlot, actionSlot, setNavLocked } = useOutletContext<TripOutletContext>();
   const session = useEditSession<InfoItem[]>(
     [],
     async (next) => {
@@ -149,11 +149,13 @@ const Info = () => {
         editSlot
       )}
 
-      <div className="flex items-center justify-between mb-3.5">
-        <div className="font-hand font-bold" style={{ fontSize: "1.6rem", color: "var(--ink)" }}>
-          小筆記
-        </div>
-        {canEdit && <AddBtn onClick={openAddItem} label="新增類別" />}
+      {canEdit && actionSlot && createPortal(
+        <AddBtn onClick={openAddItem} label="新增類別" bar />,
+        actionSlot
+      )}
+
+      <div className="font-hand font-bold mb-3.5" style={{ fontSize: "1.6rem", color: "var(--ink)" }}>
+        小筆記
       </div>
 
       {loading && (

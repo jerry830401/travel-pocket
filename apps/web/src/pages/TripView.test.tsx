@@ -24,14 +24,19 @@ const SlotChild = () => {
   return editSlot ? createPortal(<button>slot button</button>, editSlot) : null;
 };
 
-/** A tab page in edit mode, which locks the navigation. */
+/** A tab page in edit mode: it locks the navigation and puts an add button in the bottom bar. */
 const LockingChild = () => {
-  const { setNavLocked } = useOutletContext<TripOutletContext>();
+  const { setNavLocked, actionSlot } = useOutletContext<TripOutletContext>();
   useEffect(() => {
     setNavLocked(true);
     return () => setNavLocked(false);
   }, [setNavLocked]);
-  return <div>editing child</div>;
+  return (
+    <>
+      <div>editing child</div>
+      {actionSlot && createPortal(<button>add button</button>, actionSlot)}
+    </>
+  );
 };
 
 function renderAt(path: string, child = <MockChild />) {
@@ -130,16 +135,19 @@ describe("TripView", () => {
     expect(screen.getByRole("banner")).toContainElement(slotButton);
   });
 
-  it("分頁在編輯模式時停用返回與底部分頁", async () => {
+  it("分頁在編輯模式時停用返回，底部分頁換成分頁的新增按鈕", async () => {
     renderAt("/trip/trip-kyushu/schedule", <LockingChild />);
     await screen.findByText("editing child");
 
-    for (const name of ["‹", "日程", "購物", "資訊"]) {
-      const link = screen.getByRole("link", { name });
-      expect(link).toHaveAttribute("aria-disabled", "true");
-      // fireEvent returns false when the click was prevented.
-      expect(fireEvent.click(link)).toBe(false);
+    const back = screen.getByRole("link", { name: "‹" });
+    expect(back).toHaveAttribute("aria-disabled", "true");
+    // fireEvent returns false when the click was prevented.
+    expect(fireEvent.click(back)).toBe(false);
+
+    for (const name of ["日程", "購物", "資訊"]) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
     }
+    expect(screen.getByRole("button", { name: "add button" })).toBeInTheDocument();
   });
 
   it("header 沒有主題與設定按鈕（在首頁的設定頁）", async () => {

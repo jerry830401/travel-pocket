@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { Me } from "../types";
 import { useTheme, type ThemePreference } from "../contexts/ThemeContext";
 import { loadMe, signOut } from "../dataSource";
+import { circleBtn } from "../components/circleBtn";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: "light", label: "淺色" },
@@ -37,13 +38,8 @@ const Settings = () => {
       >
         <Link
           to="/"
-          className="shrink-0 flex items-center justify-center font-hand transition-all duration-150"
-          style={{
-            width: 34, height: 34, borderRadius: "50%",
-            border: "1.5px solid var(--ink)",
-            background: "transparent", color: "var(--ink)", fontSize: 22,
-            textDecoration: "none",
-          }}
+          className="font-hand transition-all duration-150"
+          style={{ ...circleBtn, fontSize: 22, textDecoration: "none" }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateX(-2px)"; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "translateX(0)"; }}
         >

@@ -4,6 +4,8 @@ import type { NewTrip, Trip } from "../types";
 import { apiEnabled, createTrip, deleteTrip, loadTrips, saveTrips } from "../dataSource";
 import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
 import { lockedLink } from "../components/lockedLink";
+import { circleBtn } from "../components/circleBtn";
+import { BottomBar } from "../components/BottomBar";
 import { useEditSession, type SaveDraft } from "../components/editor/useEditSession";
 
 function seasonTag(startDate: string) {
@@ -188,11 +190,9 @@ const Home = () => {
               to="/settings"
               aria-label="設定"
               {...lockedLink(editing)}
-              className="shrink-0 flex items-center justify-center transition-all duration-150 hover:rotate-[-10deg]"
+              className="transition-all duration-150 hover:rotate-[-10deg]"
               style={{
-                width: 36, height: 36, borderRadius: "50%",
-                border: "1.5px dashed var(--ink)",
-                background: "transparent", color: "var(--ink)",
+                ...circleBtn,
                 opacity: editing ? .35 : 1,
                 cursor: editing ? "not-allowed" : undefined,
               }}
@@ -375,13 +375,16 @@ const Home = () => {
             </Link>
           );
         })}
-
-        {canEdit && !loading && !error && (
-          <div className="flex justify-center">
-            <AddBtn onClick={openAdd} label="新增旅程" />
-          </div>
-        )}
       </div>
+
+      {/* Add button, where it can be reached without scrolling */}
+      {editable && editing && (
+        <BottomBar>
+          <div className="flex-1 flex justify-center">
+            {canEdit && <AddBtn onClick={openAdd} label="新增旅程" bar />}
+          </div>
+        </BottomBar>
+      )}
 
       {/* Add / edit modal */}
       {canEdit && (

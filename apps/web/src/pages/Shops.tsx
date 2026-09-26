@@ -45,7 +45,7 @@ function draftToShop(draft: ShopDraft, id: string): Shop {
 }
 
 const Shops = () => {
-  const { trip, editSlot, setNavLocked } = useOutletContext<TripOutletContext>();
+  const { trip, editSlot, actionSlot, setNavLocked } = useOutletContext<TripOutletContext>();
   const session = useEditSession<Shop[]>(
     [],
     async (next) => {
@@ -132,6 +132,11 @@ const Shops = () => {
           onFinish={session.finish}
         />,
         editSlot
+      )}
+
+      {canEdit && actionSlot && createPortal(
+        <AddBtn onClick={openAdd} label="新增店家" bar />,
+        actionSlot
       )}
 
       {/* Tag bar */}
@@ -293,13 +298,6 @@ const Shops = () => {
             </div>
           );
         })}
-
-        {/* Add button */}
-        {canEdit && !loading && !error && (
-          <div className="flex justify-center pt-2">
-            <AddBtn onClick={openAdd} label="新增店家" />
-          </div>
-        )}
       </div>
 
       {/* Edit / Add modal */}
