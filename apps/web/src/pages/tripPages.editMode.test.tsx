@@ -342,3 +342,36 @@ describe("日程：編輯日", () => {
     expect(ds.saveTripData).not.toHaveBeenCalled();
   });
 });
+
+describe("日程：行程依時間排序", () => {
+  /** Fills the open item modal's title and start time, and confirms it. */
+  async function fillItem(title: string | null, startTime: string) {
+    const dialog = screen.getByRole("dialog", { name: /行程項目$/ });
+    if (title !== null) await userEvent.type(within(dialog).getByPlaceholderText("行程名稱"), title);
+    fireEvent.change(within(dialog).getAllByPlaceholderText("HH:MM")[0], { target: { value: startTime } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "確定" }));
+  }
+
+  function expectOrder(first: string, second: string) {
+    expect(screen.getByText(first).compareDocumentPosition(screen.getByText(second)))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  it("新增較早的行程、改時間後，確定就移到對應位置；存的資料維持原本順序", async () => {
+    renderWithProviders(Schedule);
+    await userEvent.click(await screen.findByRole("button", { name: "編輯" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "新增行程" }));
+    await fillItem("早餐", "08:00");
+    expectOrder("早餐", "太宰府");
+
+    // The day's 編輯 comes first, then each card's in the order shown: 早餐 is first.
+    await userEvent.click(screen.getAllByTitle("編輯")[1]);
+    await fillItem(null, "13:00");
+    expectOrder("太宰府", "早餐");
+
+    await userEvent.click(screen.getByRole("button", { name: "完成" }));
+    const [saved] = ds.saveTripData.mock.calls[0][2] as ItineraryDay[];
+    expect(saved.items.map((i) => [i.title, i.startTime])).toEqual([["太宰府", "10:00"], ["早餐", "13:00"]]);
+  });
+});

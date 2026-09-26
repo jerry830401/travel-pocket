@@ -71,6 +71,10 @@ A trip is personal until its owner approves someone; then it is shared (#32). `l
 - `TripView`'s header has a 👥 button (「成員」) while the data is live and the page is not editing. It opens `ShareSheet` (`src/components/ShareSheet.tsx`), which acts at once rather than through a draft. The owner creates and copies (or, with `navigator.share`, shares) the invite link, approves or turns down requests and removes members; a member sees who shares the trip and can leave, after which `TripView` returns to Home. `ShareSheet` and `EditModal` share the bottom `Sheet` (`src/components/editor/index.tsx`), a `role="dialog"` named by its title.
 - Invite links are `/?join=<code>`, not a hash route: Cloudflare Access sends a signed-out visitor back to the path and query after sign-in, but never sees the hash. `routeJoinLink` (`src/joinLink.ts`, run in `main.tsx` before the router starts) moves the code to `#/join/<code>`. The join page (`src/pages/Join.tsx`) shows the trip and its owner and offers 申請加入; after that it says the request waits for the owner, and for a member or the owner it links to the trip. An unknown or malformed code reads as an invalid link.
 
+### Schedule
+
+Schedule orders its days by date whenever a day is added or edited (#35). It shows each day's items in time order (`sortItems` in `src/pages/scheduleUtils.ts`, #37): by `startTime`, or by `endTime` for an item with only that (an arrival); an item with neither stays after the one before it, and ties keep their order. Only the display is sorted, so a new or retimed item moves as soon as its modal's 確定 is pressed, the saved list keeps its own order, and old data needs no resave. An item after midnight sorts to the top of its day.
+
 ### Static JSON
 
 On the dev server only, the static trip data is served from `${BASE_URL}data/`. The JSON files live in the `@travel-pocket/data` package ([packages/data/](../../packages/data/CLAUDE.md)), not in this app:

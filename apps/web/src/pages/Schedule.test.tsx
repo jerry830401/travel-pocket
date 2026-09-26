@@ -3,8 +3,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../contexts/ThemeContext";
-import type { ItineraryDay, Trip } from "../types";
-import { toMins, gapLabel, dateBig, weekday } from "./scheduleUtils";
+import type { ItineraryDay, ItineraryItem, Trip } from "../types";
+import { toMins, gapLabel, dateBig, weekday, sortItems } from "./scheduleUtils";
 
 /* ── Pure-function tests ─────────────────────────────────────── */
 
@@ -66,6 +66,44 @@ describe("weekday", () => {
     expect(weekday("2024-03-11")).toBe("MON");
     // 2024-03-15 是 FRI
     expect(weekday("2024-03-15")).toBe("FRI");
+  });
+});
+
+describe("sortItems", () => {
+  const item = (id: string, startTime: string, endTime = ""): ItineraryItem => ({
+    id, title: id, location: "", category: "other", startTime, endTime,
+  });
+  const ids = (items: ItineraryItem[]) => items.map((i) => i.id);
+
+  it("依開始時間排序", () => {
+    expect(ids(sortItems([item("c", "15:00"), item("a", "08:00"), item("b", "10:30")])))
+      .toEqual(["a", "b", "c"]);
+  });
+
+  it("沒有開始時間時用結束時間", () => {
+    expect(ids(sortItems([item("arrive", "", "11:50"), item("depart", "10:00"), item("spa", "13:20")])))
+      .toEqual(["depart", "arrive", "spa"]);
+  });
+
+  it("都沒有時間的跟著前一個項目移動", () => {
+    expect(ids(sortItems([item("late", "18:00"), item("note", ""), item("early", "09:00")])))
+      .toEqual(["early", "late", "note"]);
+  });
+
+  it("排在最前面、都沒有時間的留在最前面", () => {
+    expect(ids(sortItems([item("note", ""), item("late", "18:00"), item("early", "09:00")])))
+      .toEqual(["note", "early", "late"]);
+  });
+
+  it("時間相同時維持原本順序", () => {
+    expect(ids(sortItems([item("b", "10:00"), item("a", "10:00"), item("c", "09:00")])))
+      .toEqual(["c", "b", "a"]);
+  });
+
+  it("不改動傳入的陣列", () => {
+    const items = [item("b", "10:00"), item("a", "09:00")];
+    sortItems(items);
+    expect(ids(items)).toEqual(["b", "a"]);
   });
 });
 
@@ -211,6 +249,21 @@ describe("Schedule component", () => {
     renderSchedule();
     // item-1 ends 12:00, item-2 starts 15:00 → gap 3h
     await waitFor(() => expect(screen.getByText("3h")).toBeInTheDocument());
+  });
+
+  it("行程依時間顯示，不照存的順序，間隔時間也照顯示的順序算", async () => {
+    const [day1, day2] = mockDays;
+    const reversed = [{ ...day1, items: [...day1.items].reverse() }, day2];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(reversed),
+    } as Response);
+    renderSchedule();
+
+    const first = await screen.findByText("搭飛機出發");
+    expect(first.compareDocumentPosition(screen.getByText("抵達飯店")))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getByText("3h")).toBeInTheDocument();
   });
 
   it("點開行程後，地點按鈕用地點查詢 Google Map", async () => {

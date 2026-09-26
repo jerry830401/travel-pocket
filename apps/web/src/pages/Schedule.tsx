@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
 import { EditModal, FieldInput, FieldTextarea, FieldSelect, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
 import { useEditSession } from "../components/editor/useEditSession";
-import { toMins, gapLabel, dateBig, weekday } from "./scheduleUtils";
+import { toMins, gapLabel, dateBig, weekday, sortItems } from "./scheduleUtils";
 import { mapSearchUrl } from "../mapSearchUrl";
 
 /* Category sticker data */
@@ -449,9 +449,10 @@ const Schedule = () => {
               </div>
             )}
 
-            {currentDay?.items.map((item, j) => {
+            {/* Shown in time order; the saved list keeps its own order */}
+            {currentDay && sortItems(currentDay.items).map((item, j, items) => {
               const cat = gc(item.category);
-              const next = currentDay.items[j + 1];
+              const next = items[j + 1];
               const gap = next ? gapLabel((toMins(next.startTime) ?? 0) - (toMins(item.endTime) ?? 0)) : null;
               const rot = j % 2 === 0 ? "rotate(-.4deg)" : "rotate(.4deg)";
 
