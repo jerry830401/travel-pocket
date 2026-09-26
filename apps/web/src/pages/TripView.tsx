@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Outlet, useParams, Link, useLocation, useNavigate } from "react-router-dom";
-import type { Trip } from "../types";
-import { loadTrips } from "../dataSource";
+import type { Trip, TripEntry } from "../types";
+import { apiEnabled, isShared, loadTrips } from "../dataSource";
 import { lockedLink } from "../components/lockedLink";
 import { circleBtn } from "../components/circleBtn";
 import { BottomBar } from "../components/BottomBar";
+import { ShareSheet } from "../components/ShareSheet";
 
 /**
  * What the tab pages get from `useOutletContext`. `editSlot` is the spot at the
@@ -23,7 +24,10 @@ export type TripOutletContext = {
 
 const TripView = () => {
   const { tripId } = useParams();
-  const [trip, setTrip] = useState<Trip | null>(null);
+  const [trip, setTrip] = useState<TripEntry | null>(null);
+  // Members are managed live through the API, so only with data read from it.
+  const [editable, setEditable] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [error, setError] = useState(false);
   const [editSlot, setEditSlot] = useState<HTMLElement | null>(null);
   const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
@@ -33,10 +37,11 @@ const TripView = () => {
 
   useEffect(() => {
     loadTrips()
-      .then(({ data }) => {
+      .then(({ data, editable }) => {
         const found = data.find((t) => t.id === tripId);
         if (found) setTrip(found);
         else setError(true);
+        setEditable(editable);
       })
       .catch(() => setError(true));
   }, [tripId]);
@@ -120,9 +125,26 @@ const TripView = () => {
             {trip.startDate} → {trip.endDate}
           </div>
         </div>
+        {apiEnabled && editable && !navLocked && (
+          <button
+            onClick={() => setSharing(true)}
+            aria-label="成員"
+            title={isShared(trip) ? "共享中" : "邀請成員"}
+            style={{ ...circleBtn, fontSize: 16, cursor: "pointer" }}
+          >
+            👥
+          </button>
+        )}
         {/* `contents`: no box of its own, so an empty slot adds no gap */}
         <div ref={setEditSlot} className="contents" />
       </header>
+
+      <ShareSheet
+        trip={trip}
+        open={sharing}
+        onClose={() => setSharing(false)}
+        onLeft={() => navigate("/", { replace: true })}
+      />
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto scrollbar-hide overscroll-y-contain">

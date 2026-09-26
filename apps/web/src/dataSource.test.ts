@@ -17,6 +17,9 @@ function jsonResponse(data: unknown, status = 200, headers: Record<string, strin
 
 const staticUrl = (path: string) => `${import.meta.env.BASE_URL}data/${path}`;
 
+/** What a plain trip from the static JSON gets: the viewer's own, personal and never edited. */
+const STATIC_ENTRY = { version: 0, role: "owner", ownerEmail: "", memberCount: 0, pendingCount: 0 };
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -33,7 +36,7 @@ describe("靜態模式（沒有 VITE_API_URL）", () => {
     const ds = await importDataSource();
 
     await expect(ds.loadTrips()).resolves.toEqual({
-      data: [{ id: "t1", version: 0 }],
+      data: [{ ...STATIC_ENTRY, id: "t1" }],
       editable: false,
       version: null,
     });
@@ -93,7 +96,7 @@ describe("API 模式", () => {
   });
 
   it("從 API 讀到的資料可以編輯", async () => {
-    const trips = [{ id: "t1", version: 3 }];
+    const trips = [{ ...STATIC_ENTRY, id: "t1", version: 3, role: "member", memberCount: 2 }];
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(trips));
     const ds = await importDataSource(apiEnv);
 
@@ -129,7 +132,7 @@ describe("API 模式", () => {
     const ds = await importDataSource(apiEnv);
 
     await expect(ds.loadTrips()).resolves.toEqual({
-      data: [{ id: "t1", version: 0 }],
+      data: [{ ...STATIC_ENTRY, id: "t1" }],
       editable: false,
       version: null,
     });
@@ -158,7 +161,7 @@ describe("API 模式", () => {
     const ds = await importDataSource(apiEnv);
 
     await expect(ds.loadTrips()).resolves.toEqual({
-      data: [{ id: "static", version: 0 }],
+      data: [{ ...STATIC_ENTRY, id: "static" }],
       editable: false,
       version: null,
     });
@@ -271,6 +274,76 @@ describe("API 模式", () => {
       body: image,
       redirect: "manual",
     });
+  });
+
+  it("loadMembers 讀取旅程的成員", async () => {
+    const members = { ownerEmail: "a@b.c", members: [], inviteCode: null };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(members));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.loadMembers("kyushu-2024")).resolves.toEqual(members);
+    expect(fetchSpy).toHaveBeenCalledWith("/api/trips/kyushu-2024/members", { redirect: "manual" });
+  });
+
+  it("createInvite 送出 POST，回傳邀請碼", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ inviteCode: "c0de" }));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.createInvite("kyushu-2024")).resolves.toBe("c0de");
+    expect(fetchSpy).toHaveBeenCalledWith("/api/trips/kyushu-2024/invite", {
+      method: "POST",
+      redirect: "manual",
+    });
+  });
+
+  it("inviteLink 把邀請碼放在查詢參數，登入後才不會遺失", async () => {
+    const ds = await importDataSource(apiEnv);
+    expect(ds.inviteLink("c0de")).toBe(`${window.location.origin}${import.meta.env.BASE_URL}?join=c0de`);
+  });
+
+  it("approveMember 與 removeMember 以編碼過的 email 送出 PUT 與 DELETE", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ ok: true }));
+    const ds = await importDataSource(apiEnv);
+
+    await ds.approveMember("kyushu-2024", "bob+trip@example.com");
+    expect(fetchSpy).toHaveBeenLastCalledWith("/api/trips/kyushu-2024/members/bob%2Btrip%40example.com", {
+      method: "PUT",
+      redirect: "manual",
+    });
+    await ds.removeMember("kyushu-2024", "bob@example.com");
+    expect(fetchSpy).toHaveBeenLastCalledWith("/api/trips/kyushu-2024/members/bob%40example.com", {
+      method: "DELETE",
+      redirect: "manual",
+    });
+  });
+
+  it("loadInvite 讀取邀請，找不到時回傳 null", async () => {
+    const invite = { tripId: "t1", tripName: "京都", ownerEmail: "a@b.c", status: "none" };
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(invite))
+      .mockResolvedValueOnce(jsonResponse({ error: "Invite not found" }, 404));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.loadInvite("c0de")).resolves.toEqual(invite);
+    await expect(ds.loadInvite("c0de")).resolves.toBeNull();
+  });
+
+  it("requestJoin 送出 POST，回傳申請後的邀請", async () => {
+    const invite = { tripId: "t1", tripName: "京都", ownerEmail: "a@b.c", status: "pending" };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(invite));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.requestJoin("c0de")).resolves.toEqual(invite);
+    expect(fetchSpy).toHaveBeenCalledWith("/api/invites/c0de", { method: "POST", redirect: "manual" });
+  });
+
+  it("isShared：有成員或自己是成員的旅程才算共享", async () => {
+    const ds = await importDataSource(apiEnv);
+    const own = { ...STATIC_ENTRY, id: "t1", name: "", startDate: "", endDate: "", coverImage: "", role: "owner" as const };
+    expect(ds.isShared(own)).toBe(false);
+    expect(ds.isShared({ ...own, pendingCount: 3 })).toBe(false);
+    expect(ds.isShared({ ...own, memberCount: 1 })).toBe(true);
+    expect(ds.isShared({ ...own, role: "member" })).toBe(true);
   });
 
   it("uploadCover 失敗時拋出伺服器的錯誤訊息", async () => {

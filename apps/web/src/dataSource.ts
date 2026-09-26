@@ -2,10 +2,13 @@ import { parseVersionTag, versionTag } from "@travel-pocket/shared";
 import type {
   CoverUpload,
   DataType,
+  Invite,
   Me,
   NewTrip,
   TripDataMap,
   TripEntry,
+  TripInvite,
+  TripMembers,
   TripUpdate,
 } from "./types";
 
@@ -113,10 +116,13 @@ async function load<T>(apiPath: string, staticPath: string): Promise<Loaded<T>> 
   }
 }
 
+// The static JSON has plain trips, never edited or shared: they read as the
+// viewer's own personal trips.
+const STATIC_ENTRY = { version: 0, role: "owner", ownerEmail: "", memberCount: 0, pendingCount: 0 } as const;
+
 export async function loadTrips(): Promise<Loaded<TripEntry[]>> {
   const loaded = await load<TripEntry[]>("/trips", "trips.json");
-  // The static JSON has plain trips; it is never edited, so any version will do.
-  return { ...loaded, data: loaded.data.map((trip) => ({ ...trip, version: trip.version ?? 0 })) };
+  return { ...loaded, data: loaded.data.map((trip) => ({ ...STATIC_ENTRY, ...trip })) };
 }
 
 export function loadTripData<T extends DataType>(
@@ -124,6 +130,11 @@ export function loadTripData<T extends DataType>(
   type: T
 ): Promise<Loaded<TripDataMap[T]>> {
   return load(`/trips/${tripId}/${type}`, `${tripId}/${type}.json`);
+}
+
+/** A trip is shared once it has a member, or when the user is one. */
+export function isShared(trip: TripEntry): boolean {
+  return trip.role === "member" || trip.memberCount > 0;
 }
 
 /** The signed-in user, or null without an API, when signed out, or when it cannot be reached. */
@@ -139,8 +150,8 @@ export async function loadMe(): Promise<Me | null> {
 
 // Same-origin requests carry the Cloudflare Access cookie, which is all the
 // API needs to know who is asking.
-async function write(apiPath: string, init: RequestInit): Promise<Response> {
-  if (!API_URL) throw new Error("Editing needs the API");
+async function callApi(apiPath: string, init: RequestInit): Promise<Response> {
+  if (!API_URL) throw new Error("This needs the API");
   const res = await apiFetch(apiPath, init);
   if (res.status === 412) throw new ConflictError();
   if (!res.ok) {
@@ -155,11 +166,16 @@ function send(method: "POST" | "PUT" | "DELETE", apiPath: string, body?: unknown
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (version !== undefined) headers["If-Match"] = versionTag(version);
-  return write(apiPath, {
+  return callApi(apiPath, {
     method,
     ...(Object.keys(headers).length > 0 && { headers }),
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
+}
+
+/** Reads what only the API has: no static fallback, and failures read like a write's. */
+async function read<T>(apiPath: string): Promise<T> {
+  return (await (await callApi(apiPath, {})).json()) as T;
 }
 
 export async function createTrip(trip: NewTrip): Promise<TripEntry> {
@@ -184,7 +200,7 @@ export async function deleteTrip(tripId: string): Promise<void> {
  * has, and the trip's new version.
  */
 export async function uploadCover(tripId: string, image: Blob): Promise<CoverUpload> {
-  const res = await write(`/trips/${tripId}/cover`, {
+  const res = await callApi(`/trips/${tripId}/cover`, {
     method: "PUT",
     headers: { "Content-Type": image.type },
     body: image,
@@ -201,6 +217,48 @@ export async function saveTripData<T extends DataType>(
 ): Promise<number> {
   const res = await send("PUT", `/trips/${tripId}/${type}`, data, version);
   return parseVersionTag(res.headers.get("ETag")) ?? version + 1;
+}
+
+/** Who shares the trip; pending requests and the invite code only reach its owner. */
+export function loadMembers(tripId: string): Promise<TripMembers> {
+  return read(`/trips/${tripId}/members`);
+}
+
+/** The trip's invite code, created the first time its owner asks. */
+export async function createInvite(tripId: string): Promise<string> {
+  return ((await (await send("POST", `/trips/${tripId}/invite`)).json()) as TripInvite).inviteCode;
+}
+
+/** The link that opens the join page for an invite code (see `App`'s `?join=`). */
+export function inviteLink(code: string): string {
+  return `${window.location.origin}${import.meta.env.BASE_URL}?join=${code}`;
+}
+
+const memberPath = (tripId: string, email: string) =>
+  `/trips/${tripId}/members/${encodeURIComponent(email)}`;
+
+/** The owner approves a request to join. */
+export async function approveMember(tripId: string, email: string): Promise<void> {
+  await send("PUT", memberPath(tripId, email));
+}
+
+/** The owner removes a member or turns down a request; a member passes their own email to leave. */
+export async function removeMember(tripId: string, email: string): Promise<void> {
+  await send("DELETE", memberPath(tripId, email));
+}
+
+/** The trip an invite code opens, and where the user stands with it; null for an unknown code. */
+export async function loadInvite(code: string): Promise<Invite | null> {
+  if (!API_URL) throw new Error("Invites need the API");
+  const res = await apiFetch(`/invites/${code}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as Invite;
+}
+
+/** Asks the owner to let the user join; resolves with the invite at its new status. */
+export async function requestJoin(code: string): Promise<Invite> {
+  return (await (await send("POST", `/invites/${code}`)).json()) as Invite;
 }
 
 /**

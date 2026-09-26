@@ -26,13 +26,13 @@ pnpm -F @travel-pocket/web cf-typegen      # Regenerate worker/worker-configurat
 
 ## Routing
 
-Uses **HashRouter** (not BrowserRouter): every route is served by `index.html`, so the static assets need no fallback rules. Routes follow the pattern `/#/trip/{tripId}/schedule`, `/#/trip/{tripId}/shops`, `/#/trip/{tripId}/info`. `/#/settings` is the 設定 page (theme and account), reached only from the gear link in Home's header.
+Uses **HashRouter** (not BrowserRouter): every route is served by `index.html`, so the static assets need no fallback rules. Routes follow the pattern `/#/trip/{tripId}/schedule`, `/#/trip/{tripId}/shops`, `/#/trip/{tripId}/info`. `/#/settings` is the 設定 page (theme and account), reached only from the gear link in Home's header. `/#/join/{code}` is the join page an invite link opens (see [Sharing](#sharing)).
 
 `TripView.tsx` is the nested layout shell; it fetches trip data and passes it down to child routes via `useOutletContext`.
 
 ## Data
 
-Users sign in with Google through Cloudflare Access, which sits in front of the whole site, so the app has no sign-in screen. The API sees the Access cookie on every same-origin request and returns only that user's trips; the app never sends a token.
+Users sign in with Google through Cloudflare Access, which sits in front of the whole site, so the app has no sign-in screen. The API sees the Access cookie on every same-origin request and returns only the trips that user owns or shares; the app never sends a token.
 
 Pages never call `fetch` for trip data themselves; they go through `src/dataSource.ts`:
 
@@ -51,6 +51,7 @@ Pages never call `fetch` for trip data themselves; they go through `src/dataSour
 - The add buttons (新增旅程, 新增行程 and 新增日, 新增店家, 新增類別) sit in a bottom bar while editing, so they can be reached without scrolling. They use `AddBtn`'s `bar` size inside `BottomBar` (`src/components/BottomBar.tsx`), which keeps its height while they are hidden during a save. `TripView`'s bottom bar shows the tabs, or while `setNavLocked(true)` is in effect, `actionSlot` (from the outlet context), where each tab page portals its add buttons. Home, which has no tabs, shows its own `BottomBar` while editing. Adds that belong to one card (新增連結 in Info) stay in the card.
 - Toasts come from `ToastProvider` (`src/contexts/ToastContext.tsx`, in `App.tsx`): `useToast().showToast(message, "success" | "error")`. One at a time, above the bottom nav; success is `role="status"`, error is `role="alert"`.
 - Writes: `updateTrip`, `saveTripData` (`PUT`, with `If-Match`), `createTrip` (`POST`, the server assigns the id), `deleteTrip` (`DELETE`, which also removes the trip's itinerary, shops, info and cover) and `uploadCover` (`PUT` with the image as the body; resolves with the trip's new `coverImage` and `version`). All of them reject when there is no API.
+- Sharing calls: `loadMembers`, `createInvite`, `approveMember`, `removeMember`, `loadInvite` (null for an unknown code) and `requestJoin`; `inviteLink(code)` builds the link to hand out, and `isShared(trip)` tells a shared trip from a personal one. They all need the API.
 - `loadMe()` returns the signed-in `Me`, or null. `signOut()` clears the `trip-api` cache and goes to `/cdn-cgi/access/logout`. The 設定 page (`src/pages/Settings.tsx`) shows the email, and shows 登出 outside the dev server, which has no Access.
 - Signed out: Access answers every request without a session by redirecting to its login page (which shows a 「Google」 button; instant authentication is off, so nobody is sent to Google without clicking). API calls use `redirect: "manual"`, so that redirect (or a 401) becomes a `SignInRequiredError` and notifies `onSignedOut` listeners instead of failing as a cross-origin fetch. `SignInGate` (around the routes in `App.tsx`) then replaces the app with a 「請先登入」 screen whose 前往登入 button reloads through the network (`goToSignIn`). Nothing redirects on its own. This covers the app opening from the service worker (after the session expired) and a session ending while the app is open.
 
@@ -61,6 +62,14 @@ Pages never call `fetch` for trip data themselves; they go through `src/dataSour
 | Production build | The API (`VITE_API_URL`) | Yes, for the signed-in user |
 
 `.env.fullstack` (committed) sets `VITE_API_URL=/api`; only `vite --mode fullstack` loads it. The API itself is `apps/api`; talk to it only over HTTP using the contract types from `@travel-pocket/shared`. Before the first `pnpm dev`, set up the local D1 as described in [apps/api/CLAUDE.md](../api/CLAUDE.md) (`db:migrate:local`, then `db:seed --owner dev@example.com`).
+
+### Sharing
+
+A trip is personal until its owner approves someone; then it is shared (#32). `loadTrips` returns each trip's `role` (`owner` or `member`), `ownerEmail`, `memberCount` and, for the owner, `pendingCount`; the static JSON's trips read as the viewer's own personal ones.
+
+- Home lists 個人旅程 first and 共享旅程 after them (the latter only with the API), splitting the list with `isShared`. A shared card says who shares it (「{owner} 分享」 or 「與 N 人共享」) and, for the owner, 「✋ N 人申請加入」. In edit mode a member's trip has 編輯 but no 刪除: members leave instead.
+- `TripView`'s header has a 👥 button (「成員」) while the data is live and the page is not editing. It opens `ShareSheet` (`src/components/ShareSheet.tsx`), which acts at once rather than through a draft. The owner creates and copies (or, with `navigator.share`, shares) the invite link, approves or turns down requests and removes members; a member sees who shares the trip and can leave, after which `TripView` returns to Home. `ShareSheet` and `EditModal` share the bottom `Sheet` (`src/components/editor/index.tsx`), a `role="dialog"` named by its title.
+- Invite links are `/?join=<code>`, not a hash route: Cloudflare Access sends a signed-out visitor back to the path and query after sign-in, but never sees the hash. `routeJoinLink` (`src/joinLink.ts`, run in `main.tsx` before the router starts) moves the code to `#/join/<code>`. The join page (`src/pages/Join.tsx`) shows the trip and its owner and offers 申請加入; after that it says the request waits for the owner, and for a member or the owner it links to the trip. An unknown or malformed code reads as an invalid link.
 
 ### Static JSON
 
@@ -105,7 +114,7 @@ Dark/light mode is class-based (`.dark` on `<html>`). The user picks 淺色, 深
 
 - Vitest setup file is at `src/test/setup.ts` — patches `matchMedia` for jsdom and runs `cleanup` after each test
 - Unit tests run without `VITE_API_URL`, so page tests exercise the static path by spying on `globalThis.fetch`. `src/dataSource.test.ts` covers API mode with `vi.stubEnv` plus a fresh `import()` after `vi.resetModules()`, because `dataSource.ts` reads `import.meta.env` at load time
-- `src/pages/Home.account.test.tsx` covers Home as a signed-in user (the header, edit mode, add / edit / delete trip, picking and removing a cover, a failed save and its retry, a version conflict, empty state, read-only data) by mocking `../dataSource` at the module boundary, and `../resizeImage` (jsdom has no canvas; `fitWithin` is tested on its own) with `URL.createObjectURL` stubbed; `src/pages/tripPages.editMode.test.tsx` does the same for the edit mode of Schedule, Shops and Info, and `src/pages/Settings.test.tsx` for the 設定 page (theme options, account, 登出). `src/components/editor/useEditSession.test.tsx` covers the draft, 取消, 完成 and the toasts on their own
+- `src/pages/Home.account.test.tsx` covers Home as a signed-in user (the header, edit mode, add / edit / delete trip, picking and removing a cover, a failed save and its retry, a version conflict, the personal and shared sections, empty state, read-only data) by mocking `../dataSource` at the module boundary, and `../resizeImage` (jsdom has no canvas; `fitWithin` is tested on its own) with `URL.createObjectURL` stubbed; `src/pages/tripPages.editMode.test.tsx` does the same for the edit mode of Schedule, Shops and Info, and `src/pages/Settings.test.tsx` for the 設定 page (theme options, account, 登出). `src/components/editor/useEditSession.test.tsx` covers the draft, 取消, 完成 and the toasts on their own. Sharing is covered the same way by `src/components/ShareSheet.test.tsx` (owner and member), `src/pages/Join.test.tsx`, `src/pages/TripView.share.test.tsx` (the 👥 button) and `src/joinLink.test.ts`
 - Tests that check a toast wrap the page in `ToastProvider`; without it, `useToast()` is a no-op
 - E2E tests run against the dev server at `http://localhost:5173/`; Playwright starts it automatically via `webServer` in `playwright.config.ts`. That is web's own `pnpm dev` (static mode), so E2E never needs the API
 

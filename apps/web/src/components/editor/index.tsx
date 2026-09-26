@@ -2,19 +2,19 @@ import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { circleBtn } from "../circleBtn";
 
-/* ── Modal wrapper ──────────────────────────────────────────────── */
+/* ── Bottom sheet ───────────────────────────────────────────────── */
 
-/* 確定 only updates the page's draft; the page's 完成 saves it (see
-   useEditSession). */
-interface EditModalProps {
+interface SheetProps {
+  /** Shown in the header, after `icon`; also names the dialog. */
   title: string;
+  icon: string;
   open: boolean;
   onClose: () => void;
-  onSave: () => void;
   children: React.ReactNode;
 }
 
-export function EditModal({ title, open, onClose, onSave, children }: EditModalProps) {
+/** A sheet that slides up over the page, closed by its × or a tap outside. */
+export function Sheet({ title, icon, open, onClose, children }: SheetProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -28,6 +28,8 @@ export function EditModal({ title, open, onClose, onSave, children }: EditModalP
             style={{ background: "rgba(40,30,20,.45)", backdropFilter: "blur(4px)" }}
           />
           <motion.div
+            role="dialog"
+            aria-label={title}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
@@ -49,7 +51,7 @@ export function EditModal({ title, open, onClose, onSave, children }: EditModalP
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <span className="font-hand font-bold" style={{ fontSize: "1.4rem", color: "var(--red)" }}>
-                ✏ {title}
+                {icon} {title}
               </span>
               <button
                 onClick={onClose}
@@ -65,41 +67,61 @@ export function EditModal({ title, open, onClose, onSave, children }: EditModalP
               </button>
             </div>
 
-            {/* Form content */}
-            <div className="flex flex-col gap-3">
-              {children}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2.5 mt-5">
-              <button
-                onClick={onClose}
-                style={{
-                  flex: 1, padding: "10px 0", borderRadius: 12,
-                  border: "1.5px solid var(--ink)",
-                  background: "transparent", color: "var(--ink)",
-                  fontFamily: "inherit", fontSize: ".95rem", cursor: "pointer",
-                }}
-              >
-                取消
-              </button>
-              <button
-                onClick={onSave}
-                style={{
-                  flex: 2, padding: "10px 0", borderRadius: 12,
-                  border: "1.5px solid var(--red)",
-                  background: "var(--red)", color: "#fff",
-                  fontFamily: "inherit", fontSize: ".95rem", fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                確定
-              </button>
-            </div>
+            {children}
           </motion.div>
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+/* ── Modal wrapper ──────────────────────────────────────────────── */
+
+/* 確定 only updates the page's draft; the page's 完成 saves it (see
+   useEditSession). */
+interface EditModalProps {
+  title: string;
+  open: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  children: React.ReactNode;
+}
+
+export function EditModal({ title, open, onClose, onSave, children }: EditModalProps) {
+  return (
+    <Sheet title={title} icon="✏" open={open} onClose={onClose}>
+      {/* Form content */}
+      <div className="flex flex-col gap-3">
+        {children}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2.5 mt-5">
+        <button
+          onClick={onClose}
+          style={{
+            flex: 1, padding: "10px 0", borderRadius: 12,
+            border: "1.5px solid var(--ink)",
+            background: "transparent", color: "var(--ink)",
+            fontFamily: "inherit", fontSize: ".95rem", cursor: "pointer",
+          }}
+        >
+          取消
+        </button>
+        <button
+          onClick={onSave}
+          style={{
+            flex: 2, padding: "10px 0", borderRadius: 12,
+            border: "1.5px solid var(--red)",
+            background: "var(--red)", color: "#fff",
+            fontFamily: "inherit", fontSize: ".95rem", fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          確定
+        </button>
+      </div>
+    </Sheet>
   );
 }
 

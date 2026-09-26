@@ -11,10 +11,11 @@ import type { TripEntry } from "../types";
 // Home against a signed-in API: the data layer is mocked at its module
 // boundary (the static-mode behavior is covered by Home.test.tsx).
 vi.mock("../dataSource", async (importOriginal) => {
-  const { ConflictError } = await importOriginal<typeof import("../dataSource")>();
+  const { ConflictError, isShared } = await importOriginal<typeof import("../dataSource")>();
   return {
     apiEnabled: true,
     ConflictError,
+    isShared,
     loadTrips: vi.fn(),
     updateTrip: vi.fn(),
     createTrip: vi.fn(),
@@ -38,7 +39,11 @@ vi.mock("framer-motion", () => ({
 const ds = vi.mocked(dataSource);
 const resizeImage = vi.mocked(resize.resizeImage);
 
+/** What every trip below has unless it says otherwise: the viewer's own, not shared. */
+const OWN = { role: "owner", ownerEmail: "me@example.com", memberCount: 0, pendingCount: 0 } as const;
+
 const tokyo: TripEntry = {
+  ...OWN,
   id: "trip-tokyo",
   name: "東京春遊",
   startDate: "2024-03-10",
@@ -48,6 +53,7 @@ const tokyo: TripEntry = {
 };
 
 const sendai: TripEntry = {
+  ...OWN,
   id: "trip-sendai",
   name: "仙台夏祭",
   startDate: "2024-08-05",
@@ -57,6 +63,7 @@ const sendai: TripEntry = {
 };
 
 const kyoto: TripEntry = {
+  ...OWN,
   id: "srv-1",
   name: "京都",
   startDate: "2026-11-01",
@@ -130,7 +137,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   ds.loadTrips.mockResolvedValue({ data: [tokyo, sendai], editable: true, version: null });
-  ds.updateTrip.mockImplementation(async (id, fields, version) => ({ id, ...fields, version: version + 1 }));
+  ds.updateTrip.mockImplementation(async (id, fields, version) => ({ ...OWN, id, ...fields, version: version + 1 }));
   ds.createTrip.mockResolvedValue(kyoto);
   ds.deleteTrip.mockResolvedValue(undefined);
   // Nobody else saves in between: the upload bumps the version the trip was read at.
@@ -200,6 +207,47 @@ describe("編輯模式", () => {
     expect(settings).toHaveAttribute("aria-disabled", "true");
     // fireEvent returns false when the click was prevented.
     expect(fireEvent.click(settings)).toBe(false);
+  });
+});
+
+describe("個人與共享", () => {
+  const nara: TripEntry = { ...kyoto, id: "trip-nara", name: "奈良", role: "member", ownerEmail: "alice@example.com", memberCount: 2 };
+  const osaka: TripEntry = { ...kyoto, id: "trip-osaka", name: "大阪", memberCount: 1, pendingCount: 2 };
+
+  /** Whether `a` comes before `b` on the page. */
+  const before = (a: HTMLElement, b: HTMLElement) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it("沒有成員的旅程在個人區，自己分享的和別人分享給我的在共享區", async () => {
+    ds.loadTrips.mockResolvedValue({ data: [tokyo, osaka, nara], editable: true, version: null });
+    renderHome();
+
+    const sharedHeading = await screen.findByRole("heading", { name: "共享旅程" });
+    const personalHeading = screen.getByRole("heading", { name: "個人旅程" });
+    expect(before(personalHeading, card("東京春遊"))).toBe(true);
+    expect(before(card("東京春遊"), sharedHeading)).toBe(true);
+    expect(before(sharedHeading, card("大阪"))).toBe(true);
+    expect(before(sharedHeading, card("奈良"))).toBe(true);
+
+    expect(within(card("奈良")).getByText("alice@example.com 分享")).toBeInTheDocument();
+    expect(within(card("大阪")).getByText("與 1 人共享")).toBeInTheDocument();
+    expect(within(card("大阪")).getByText("✋ 2 人申請加入")).toBeInTheDocument();
+    expect(within(card("東京春遊")).queryByText(/共享|分享/)).not.toBeInTheDocument();
+  });
+
+  it("還沒有共享的旅程時提示怎麼邀請", async () => {
+    renderHome();
+    expect(await screen.findByText(/還沒有共享的旅程/)).toBeInTheDocument();
+  });
+
+  it("別人分享給我的旅程可以編輯，但不能刪除", async () => {
+    ds.loadTrips.mockResolvedValue({ data: [nara], editable: true, version: null });
+    renderHome();
+
+    await startEditing();
+    expect(within(card("奈良")).getByTitle("編輯")).toBeInTheDocument();
+    expect(within(card("奈良")).queryByTitle("刪除")).not.toBeInTheDocument();
+    expect(screen.getByText("沒有個人旅程")).toBeInTheDocument();
   });
 });
 
