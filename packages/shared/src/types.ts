@@ -17,11 +17,7 @@ export interface ItineraryItem {
   category: "food" | "transport" | "accommodation" | "sightseeing" | "other";
   startTime: string;
   endTime: string;
-  /** @deprecated Maps are searched by `location`; being removed (#30). */
-  googleMapLink?: string;
   description?: string | string[];
-  /** @deprecated Never shown; being removed (#30). */
-  thumbnail?: string;
 }
 
 export interface ItineraryDay {
@@ -37,8 +33,6 @@ export interface Shop {
   location: string;
   tags: string[];
   businessHours: string;
-  /** @deprecated Maps are searched by `location`; being removed (#30). */
-  googleMapLink?: string;
 }
 
 export interface InfoLink {
