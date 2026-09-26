@@ -76,7 +76,7 @@ description: 在這個 repo 評估需求、規劃或改任何檔案前使用。�
   - 標題：`<範圍>：<描述>`。範圍例如 `monorepo`、`shared`、`api`、`web`、`deploy`、`docs`、`追蹤`。
   - 內文章節：`## 背景`、`## 工作項目`（checkbox，可再分 `###` 小節）、`## 驗收條件`，視需要加 `## 待決定`、`## 相依` 或 `## 相關`。補充說明用 `> [!NOTE]`、`> [!WARNING]`。
   - label：從現有 label 選（`gh label list -R jerry830401/travel-pocket`），例如 `enhancement`、`bug`、`documentation`。
-  - 屬於後端導入的工作要註明 Part of #6。
+  - 屬於某張追蹤 issue 的工作，內文註明 `Part of #<追蹤 issue>`。
   - 內文先寫進 scratchpad 檔案，再用 `gh issue create -R jerry830401/travel-pocket --title <標題> --label <label> --body-file <檔案>` 建立。
 - 寫完後回報 issue 連結，接著直接實作，不用再問一次。
 
@@ -86,7 +86,7 @@ description: 在這個 repo 評估需求、規劃或改任何檔案前使用。�
 
 - 實作中要偏離已同意的做法（多改檔案、換做法、發現範圍外的問題）：停下來回報，回到第 3 步討論，更新 issue 後才繼續。
 - commit message 加 `Refs #N`。
-- PR 描述寫 `Closes #N`；追蹤 issue 底下的工作再加 `Part of #6`。
+- PR 描述寫 `Closes #N`；追蹤 issue 底下的工作再加 `Part of #<追蹤 issue>`。
 - 完成後逐條對照「驗收條件」回報結果。
 - **勾選 checkbox 不用先問**：工作項目已完成、驗收條件已實際驗證通過的，直接勾選。
   - 只勾真的做完並驗證過的；沒驗證、只做一部分、或驗證失敗的保持不勾，並說明原因。
