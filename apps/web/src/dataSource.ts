@@ -1,4 +1,4 @@
-import type { DataType, Me, NewTrip, Trip, TripDataMap } from "./types";
+import type { CoverUpload, DataType, Me, NewTrip, Trip, TripDataMap } from "./types";
 
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/+$/, "");
 
@@ -113,20 +113,24 @@ export async function loadMe(): Promise<Me | null> {
 
 // Same-origin requests carry the Cloudflare Access cookie, which is all the
 // API needs to know who is asking.
-async function send(method: "POST" | "PUT" | "DELETE", apiPath: string, body?: unknown) {
+async function write(apiPath: string, init: RequestInit): Promise<Response> {
   if (!API_URL) throw new Error("Editing needs the API");
-  const res = await apiFetch(apiPath, {
+  const res = await apiFetch(apiPath, init);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+  return res;
+}
+
+function send(method: "POST" | "PUT" | "DELETE", apiPath: string, body?: unknown) {
+  return write(apiPath, {
     method,
     ...(body !== undefined && {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? `HTTP ${res.status}`);
-  }
-  return res;
 }
 
 export async function saveTrips(trips: Trip[]): Promise<void> {
@@ -139,6 +143,16 @@ export async function createTrip(trip: NewTrip): Promise<Trip> {
 
 export async function deleteTrip(tripId: string): Promise<void> {
   await send("DELETE", `/trips/${tripId}`);
+}
+
+/** Uploads the trip's cover and resolves with the `coverImage` URL the trip now has. */
+export async function uploadCover(tripId: string, image: Blob): Promise<string> {
+  const res = await write(`/trips/${tripId}/cover`, {
+    method: "PUT",
+    headers: { "Content-Type": image.type },
+    body: image,
+  });
+  return ((await res.json()) as CoverUpload).coverImage;
 }
 
 export async function saveTripData<T extends DataType>(

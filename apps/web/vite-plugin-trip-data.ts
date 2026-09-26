@@ -13,7 +13,7 @@ const TRIP_DATA_DIR = path.dirname(
 const TYPE_FILES = new Set(DATA_TYPES.map((type) => `${type}.json`));
 
 // Maps a path under data/ to a file in the package, or null when the path
-// is not a trip data file (e.g. snapshot.jpg, which stays in public/data/).
+// is not a trip data file (e.g. a cover image, which stays in public/data/).
 function toDataFile(urlPath: string): string | null {
   const parts = urlPath.split("/").filter(Boolean);
   if (parts.length === 1 && parts[0] === "trips.json") return "trips.json";

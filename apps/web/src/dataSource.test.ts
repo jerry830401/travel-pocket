@@ -73,6 +73,7 @@ describe("靜態模式（沒有 VITE_API_URL）", () => {
       ds.createTrip({ name: "x", startDate: "2026-01-01", endDate: "2026-01-02", coverImage: "" })
     ).rejects.toThrow();
     await expect(ds.deleteTrip("kyushu-2024")).rejects.toThrow();
+    await expect(ds.uploadCover("kyushu-2024", new Blob())).rejects.toThrow();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
@@ -208,6 +209,28 @@ describe("API 模式", () => {
       method: "DELETE",
       redirect: "manual",
     });
+  });
+
+  it("uploadCover 以圖片本身為 body 送出 PUT，回傳旅程新的 coverImage", async () => {
+    const coverImage = "/api/trips/kyushu-2024/cover?v=1";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ coverImage }));
+    const ds = await importDataSource(apiEnv);
+
+    const image = new Blob(["jpeg"], { type: "image/jpeg" });
+    await expect(ds.uploadCover("kyushu-2024", image)).resolves.toBe(coverImage);
+    expect(fetchSpy).toHaveBeenCalledWith("/api/trips/kyushu-2024/cover", {
+      method: "PUT",
+      headers: { "Content-Type": "image/jpeg" },
+      body: image,
+      redirect: "manual",
+    });
+  });
+
+  it("uploadCover 失敗時拋出伺服器的錯誤訊息", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ error: "Cover is too large" }, 413));
+    const ds = await importDataSource(apiEnv);
+
+    await expect(ds.uploadCover("kyushu-2024", new Blob())).rejects.toThrow("Cover is too large");
   });
 
   it("寫入回應非 ok 時拋出伺服器的錯誤訊息", async () => {
