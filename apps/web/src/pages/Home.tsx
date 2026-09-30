@@ -3,19 +3,14 @@ import { Link } from "react-router-dom";
 import type { NewTrip, Trip, TripEntry } from "../types";
 import { apiEnabled, createTrip, deleteTrip, isShared, loadTrips, updateTrip, uploadCover } from "../dataSource";
 import { resizeImage } from "../resizeImage";
-import { EditModal, FieldInput, FieldImage, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
+import { EditModal, FieldInput, FieldImage, EditBtn, DeleteBtn, AddBtn, EditControls, EditingBanner, ReadOnlyBanner } from "../components/editor";
 import { lockedLink } from "../components/lockedLink";
 import { circleBtn } from "../components/circleBtn";
+import { btn } from "../components/btn";
+import { Icon } from "../components/icons";
 import { BottomBar } from "../components/BottomBar";
 import { useEditSession, type SaveDraft } from "../components/editor/useEditSession";
-
-function seasonTag(startDate: string) {
-  const m = parseInt(startDate.split("-")[1], 10);
-  if (m >= 3 && m <= 5) return "❄ 春";
-  if (m >= 6 && m <= 8) return "☀ 夏";
-  if (m >= 9 && m <= 11) return "🌿 秋";
-  return "❄ 冬";
-}
+import { dateRange, season, tripDays, tripStatus } from "../tripDates";
 
 const WASHI = [
   { l: "var(--red)", r: "var(--blue)" },
@@ -23,9 +18,53 @@ const WASHI = [
   { l: "var(--purple)", r: "var(--red)" },
 ];
 
-function calcDays(s: string, e: string) {
-  return Math.round((new Date(e).getTime() - new Date(s).getTime()) / 86400000) + 1;
+const washi = (color: string) =>
+  `repeating-linear-gradient(45deg, ${color} 0 6px, color-mix(in srgb, ${color} 60%, transparent) 6px 12px)`;
+
+/** The postmark on a trip's cover: days until it starts, the day it is on, or 已結束. */
+function Postmark({ trip }: { trip: Trip }) {
+  const status = tripStatus(trip.startDate, trip.endDate);
+  const color = status.kind === "upcoming" ? "var(--red)" : status.kind === "ongoing" ? "var(--green)" : "var(--ink-soft)";
+  const halo = "color-mix(in srgb, var(--paper) 90%, transparent)";
+  const small: React.CSSProperties = { fontSize: 11, lineHeight: 1.1 };
+  const label: React.CSSProperties = { fontSize: 14, fontWeight: 600, lineHeight: 1 };
+  const sub: React.CSSProperties = { fontSize: 10, letterSpacing: ".06em", marginTop: 3 };
+  return (
+    <div
+      className="absolute z-10 flex flex-col items-center justify-center"
+      style={{
+        left: 12, top: 12, width: 76, height: 76, borderRadius: "50%",
+        border: `2px solid ${color}`, background: halo, color,
+        transform: "rotate(-10deg)", boxShadow: `0 0 0 3px ${halo}, 0 0 0 4.5px ${color}`,
+      }}
+    >
+      {status.kind === "upcoming" && (
+        <>
+          <span style={small}>還有</span>
+          <span className="font-hand font-bold" style={{ fontSize: 30, lineHeight: .95 }}>{status.daysLeft}</span>
+          <span style={small}>天</span>
+        </>
+      )}
+      {status.kind === "ongoing" && (
+        <>
+          <span style={label}>旅行中</span>
+          <span className="font-mono" style={sub}>DAY {status.day}</span>
+        </>
+      )}
+      {status.kind === "ended" && (
+        <>
+          <span style={label}>已結束</span>
+          <span className="font-mono" style={sub}>{trip.endDate.slice(0, 7).replace("-", ".")}</span>
+        </>
+      )}
+    </div>
+  );
 }
+
+const chip = (color: string, background: string): React.CSSProperties => ({
+  display: "inline-flex", alignItems: "center", gap: 5, maxWidth: "100%",
+  padding: "1px 10px", borderRadius: 12, fontSize: 16, color, background,
+});
 
 type TripDraft = {
   name: string;
@@ -267,8 +306,8 @@ const Home = () => {
         // Opening a trip would drop the draft, so edit mode stays here.
         aria-disabled={editing || undefined}
         onClick={(e) => { if (editing) e.preventDefault(); }}
-        className={`block mb-8 ${editing ? "cursor-default" : "cursor-pointer"}`}
-        style={{ transform: baseRotate, transition: "transform .25s cubic-bezier(.2,.8,.3,1), box-shadow .2s", display: "block" }}
+        className={`block mb-8 mx-1 ${editing ? "cursor-default" : "cursor-pointer"}`}
+        style={{ transform: baseRotate, transition: "transform .25s cubic-bezier(.2,.8,.3,1)", display: "block" }}
         onMouseEnter={e => {
           const el = e.currentTarget as HTMLElement;
           el.style.transform = "rotate(0deg) translateY(-3px)";
@@ -281,37 +320,35 @@ const Home = () => {
           className="relative rounded-md"
           style={{
             background: "var(--paper)",
-            padding: "10px 10px 18px",
-            boxShadow: "0 4px 14px rgba(40,30,20,.12),0 1px 3px rgba(40,30,20,.08)",
+            padding: "10px 10px 16px",
+            boxShadow: "0 4px 14px var(--shadow), 0 1px 3px var(--shadow)",
           }}
         >
           {/* Washi tapes */}
           <div aria-hidden style={{
             position: "absolute", top: -10, left: 30, width: 90, height: 22, zIndex: 3,
-            background: `repeating-linear-gradient(45deg, ${w.l} 0 6px, color-mix(in srgb, ${w.l} 60%, transparent) 6px 12px)`,
-            transform: "rotate(-7deg)", boxShadow: "0 2px 4px rgba(40,30,20,.18)",
+            background: washi(w.l), transform: "rotate(-7deg)", boxShadow: "0 2px 4px var(--shadow)",
           }} />
           <div aria-hidden style={{
             position: "absolute", top: -10, right: 24, width: 70, height: 22, zIndex: 3,
-            background: `repeating-linear-gradient(45deg, ${w.r} 0 6px, color-mix(in srgb, ${w.r} 60%, transparent) 6px 12px)`,
-            transform: "rotate(8deg)", boxShadow: "0 2px 4px rgba(40,30,20,.18)",
+            background: washi(w.r), transform: "rotate(8deg)", boxShadow: "0 2px 4px var(--shadow)",
           }} />
 
           {/* Edit / delete buttons, left of the → circle */}
           {canEdit && (
             <div
               className="absolute z-10 flex gap-0.5"
-              style={{ bottom: 24, right: 58 }}
+              style={{ bottom: 18, right: 58 }}
               onClick={(e) => e.preventDefault()}
             >
               <EditBtn onClick={(e) => openEdit(trip, e)} />
-              {/* Only the owner deletes a trip; a member leaves it from the trip's 👥 sheet. */}
+              {/* Only the owner deletes a trip; a member leaves it from the trip's 成員 sheet. */}
               {trip.role === "owner" && <DeleteBtn onClick={(e) => handleDelete(trip, e)} />}
             </div>
           )}
 
           {/* Cover */}
-          <div className="relative overflow-hidden rounded-sm" style={{ height: 170 }}>
+          <div className="relative overflow-hidden rounded-sm" style={{ height: 164 }}>
             {trip.coverImage ? (
               <img
                 src={trip.coverImage}
@@ -321,62 +358,61 @@ const Home = () => {
               />
             ) : (
               <div
-                aria-hidden
-                className="w-full h-full flex items-center justify-center"
-                style={{ background: "var(--paper-2)", fontSize: "2.6rem" }}
+                className="hatch-bg w-full h-full flex flex-col items-center justify-center gap-1.5"
+                style={{ color: "var(--ink-faint)" }}
               >
-                🧳
+                <Icon name="briefcase" size={34} strokeWidth={1.6} />
+                <span className="font-hand" style={{ fontSize: "1rem", color: "var(--ink-soft)" }}>還沒有封面</span>
               </div>
             )}
-            <div aria-hidden style={{
-              position: "absolute", inset: 0,
-              backgroundImage: "radial-gradient(rgba(255,255,255,.16) 1px,transparent 1px)",
-              backgroundSize: "8px 8px", mixBlendMode: "overlay",
-            }} />
+            <Postmark trip={trip} />
             <span
               className="font-hand font-bold absolute right-3 top-3 z-10"
-              style={{ fontSize: "1rem", color: "#fff", background: "rgba(0,0,0,.35)", padding: "2px 10px", borderRadius: 12, transform: "rotate(3deg)" }}
+              style={{ fontSize: 17, color: "#fff", background: "rgba(0,0,0,.38)", padding: "1px 12px", borderRadius: 12, transform: "rotate(3deg)" }}
             >
-              {seasonTag(trip.startDate)}
+              {season(trip.startDate)}
             </span>
           </div>
 
           {/* Meta */}
           <div style={{ padding: "12px 6px 0" }}>
-            <div className="font-hand font-bold leading-none" style={{ fontSize: "2.05rem", letterSpacing: "-0.01em", color: "var(--ink)" }}>
+            <div className="font-hand font-bold leading-none" style={{ fontSize: "2.1rem", letterSpacing: "-0.01em", color: "var(--ink)" }}>
               {trip.name}
             </div>
             <div className="font-hand flex items-center gap-2 mt-1.5" style={{ fontSize: "1.1rem", color: "var(--ink-soft)" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-              <span>{trip.startDate} → {trip.endDate}</span>
+              <Icon name="calendar" size={14} />
+              <span>{dateRange(trip.startDate, trip.endDate)}</span>
             </div>
-            {isShared(trip) && (
-              <div className="font-hand flex items-center gap-1.5 mt-1" style={{ fontSize: "1rem", color: "var(--blue)" }}>
-                <span aria-hidden>👥</span>
-                <span className="truncate">
-                  {trip.role === "member" ? `${trip.ownerEmail} 分享` : `與 ${trip.memberCount} 人共享`}
-                </span>
-              </div>
-            )}
-            {trip.pendingCount > 0 && (
-              <div className="font-hand font-bold mt-1" style={{ fontSize: "1rem", color: "var(--red)" }}>
-                ✋ {trip.pendingCount} 人申請加入
+            {(isShared(trip) || trip.pendingCount > 0) && (
+              <div className="font-hand font-bold flex flex-wrap gap-1.5 mt-2">
+                {isShared(trip) && (
+                  <span style={chip("var(--blue)", "var(--blue-soft)")}>
+                    <Icon name="users" size={14} />
+                    <span className="truncate">
+                      {trip.role === "member" ? `${trip.ownerEmail} 分享` : `與 ${trip.memberCount} 人共享`}
+                    </span>
+                  </span>
+                )}
+                {trip.pendingCount > 0 && (
+                  <span style={chip("var(--red)", "var(--red-soft)")}>
+                    <Icon name="userPlus" size={14} />
+                    <span>{trip.pendingCount} 人申請加入</span>
+                  </span>
+                )}
               </div>
             )}
           </div>
 
           <div className="flex justify-between items-center mt-2.5 px-1.5">
-            <span className="font-mono" style={{ fontSize: ".7rem", color: "var(--ink-soft)", letterSpacing: ".05em" }}>
-              {trip.startDate.slice(0, 4)} · {calcDays(trip.startDate, trip.endDate)} DAYS
+            <span className="font-mono" style={{ fontSize: ".7rem", color: "var(--ink-soft)", letterSpacing: ".08em" }}>
+              {trip.startDate.slice(0, 4)} · {tripDays(trip.startDate, trip.endDate)} DAYS
             </span>
             <span
-              className="font-hand font-bold flex items-center justify-center"
+              className="flex items-center justify-center"
               aria-hidden
-              style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--ink)", color: "var(--paper)", fontSize: 20 }}
+              style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--ink)", color: "var(--paper)" }}
             >
-              →
+              <Icon name="arrowRight" size={18} strokeWidth={2.4} />
             </span>
           </div>
         </div>
@@ -385,24 +421,25 @@ const Home = () => {
   };
 
   const shown = trips.filter((trip) => matchesFilter(trip, filter)).sort(newestFirst);
+  const count = (f: TripFilter) => trips.filter((trip) => matchesFilter(trip, f)).length;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div
-        className="shrink-0 pt-safe-home px-6 pb-5 relative"
+        className="shrink-0 pt-safe-home pl-6 pr-5 pb-5 relative"
         style={{ background: "var(--paper)", borderBottom: "1.5px dashed var(--rule)" }}
       >
         <div
           aria-hidden
           style={{
-            position: "absolute", top: -6, right: 30, width: 60, height: 18,
-            background: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--red) 80%, transparent) 0 5px, color-mix(in srgb, var(--red) 60%, transparent) 5px 10px)",
+            position: "absolute", top: -6, right: 120, width: 60, height: 18,
+            background: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--red) 80%, transparent) 0 5px, color-mix(in srgb, var(--red) 55%, transparent) 5px 10px)",
             transform: "rotate(8deg)",
-            boxShadow: "0 2px 4px rgba(40,30,20,.18)",
+            boxShadow: "0 2px 4px var(--shadow)",
           }}
         />
-        <div className="flex justify-between items-start gap-4">
+        <div className="flex justify-between items-start gap-3">
           <div>
             <h1
               className="font-hand font-bold leading-none"
@@ -410,12 +447,9 @@ const Home = () => {
             >
               Travel Pocket
             </h1>
-            <svg width="160" height="9" viewBox="0 0 160 9" className="mt-1.5">
+            <svg width="160" height="9" viewBox="0 0 160 9" className="mt-1.5" aria-hidden>
               <path d="M2 5 Q 25 1, 45 5 T 85 5 T 125 5 T 158 5" fill="none" stroke="var(--red)" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            <p className="font-hand italic mt-1" style={{ fontSize: "1.05rem", color: "var(--ink-soft)" }}>
-              my little travel journal · 旅の記録
-            </p>
           </div>
           <div className="shrink-0 flex items-center gap-2">
             {editable && !loading && !error && (
@@ -439,14 +473,17 @@ const Home = () => {
                 cursor: editing ? "not-allowed" : undefined,
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
+              <Icon name="gear" size={19} />
             </Link>
           </div>
         </div>
+        {/* Under the row, so the edit controls never squeeze it onto two lines */}
+        <p className="font-hand italic mt-1" style={{ fontSize: "1.05rem", color: "var(--ink-soft)" }}>
+          my little travel journal · 旅の記録
+        </p>
       </div>
+
+      {editing && <EditingBanner />}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto scrollbar-hide dot-grid-bg px-4 pb-8 pt-5">
@@ -454,7 +491,7 @@ const Home = () => {
 
         {/* Filter: every trip, or only the personal or the shared ones */}
         {apiEnabled && !loading && !error && trips.length > 0 && (
-          <div role="group" aria-label="篩選旅程" className="flex gap-2 mb-6 mx-1">
+          <div role="group" aria-label="篩選旅程" className="flex gap-2 mb-7 mx-1">
             {FILTERS.map(({ value, label }) => {
               const active = filter === value;
               return (
@@ -463,16 +500,19 @@ const Home = () => {
                   type="button"
                   aria-pressed={active}
                   onClick={() => chooseFilter(value)}
-                  className="font-hand font-bold"
+                  className="font-hand font-bold flex items-baseline gap-1.5"
                   style={{
-                    padding: "3px 16px", borderRadius: 16,
+                    padding: "4px 16px", borderRadius: 18,
                     border: "1.5px solid var(--ink)",
                     background: active ? "var(--ink)" : "transparent",
                     color: active ? "var(--paper)" : "var(--ink)",
-                    fontSize: "1rem", cursor: "pointer",
+                    fontSize: "1.1rem", cursor: "pointer",
+                    transform: active ? "rotate(-1.5deg)" : "none",
+                    boxShadow: active ? "2px 2px 0 var(--red)" : "none",
                   }}
                 >
                   {label}
+                  <span className="font-mono" aria-hidden style={{ fontSize: 11, fontWeight: 400, opacity: .7 }}>{count(value)}</span>
                 </button>
               );
             })}
@@ -481,18 +521,15 @@ const Home = () => {
 
         {/* Error state */}
         {error && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4 font-hand" style={{ color: "var(--ink-soft)" }}>
-            <span style={{ fontSize: "2.4rem" }}>😵</span>
-            <p style={{ fontSize: "1.1rem" }}>旅行清單載入失敗</p>
+          <div className="flex flex-col items-center justify-center py-16 gap-3 font-hand" style={{ color: "var(--ink-soft)" }}>
+            <span className="st-fd flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: "50%" }}>
+              <Icon name="cloudOff" size={24} strokeWidth={1.8} />
+            </span>
+            <p style={{ fontSize: "1.2rem", color: "var(--ink)" }}>旅行清單載入失敗</p>
             <button
               onClick={() => { setLoading(true); setError(false); setRetry((r) => r + 1); }}
               className="font-hand font-bold"
-              style={{
-                padding: "6px 22px", borderRadius: 18,
-                border: "1.5px solid var(--ink)",
-                background: "var(--ink)", color: "var(--paper)",
-                fontSize: "1rem", cursor: "pointer",
-              }}
+              style={btn("primary")}
             >
               重試
             </button>
@@ -505,7 +542,7 @@ const Home = () => {
             {[...Array(2)].map((_, i) => (
               <div
                 key={i}
-                className="block mb-8"
+                className="block mb-8 mx-1"
                 style={{ transform: i % 2 === 0 ? "rotate(-1.2deg)" : "rotate(1deg)" }}
               >
                 <div
@@ -513,10 +550,10 @@ const Home = () => {
                     background: "var(--paper)",
                     padding: "10px 10px 18px",
                     borderRadius: 6,
-                    boxShadow: "0 4px 14px rgba(40,30,20,.12)",
+                    boxShadow: "0 4px 14px var(--shadow)",
                   }}
                 >
-                  <div className="skeleton" style={{ height: 170, borderRadius: 4 }} />
+                  <div className="skeleton" style={{ height: 164, borderRadius: 4 }} />
                   <div className="skeleton" style={{ height: 32, width: "65%", borderRadius: 4, marginTop: 14 }} />
                   <div className="skeleton" style={{ height: 18, width: "45%", borderRadius: 4, marginTop: 8 }} />
                 </div>
@@ -527,9 +564,12 @@ const Home = () => {
 
         {/* Empty state: a new account starts without trips */}
         {!loading && !error && trips.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 font-hand" style={{ color: "var(--ink-soft)" }}>
-            <span style={{ fontSize: "2.4rem" }}>🧳</span>
-            <p style={{ fontSize: "1.1rem" }}>還沒有旅行筆記</p>
+          <div className="flex flex-col items-center justify-center py-12 gap-3 font-hand text-center" style={{ color: "var(--ink-soft)" }}>
+            <span className="st-in flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: "50%" }}>
+              <Icon name="briefcase" size={24} strokeWidth={1.8} />
+            </span>
+            <p style={{ fontSize: "1.2rem", color: "var(--ink)" }}>還沒有旅行筆記</p>
+            {editable && !editing && <p style={{ fontSize: "1rem" }}>按右上角的鉛筆，新增第一趟旅程</p>}
           </div>
         )}
 
@@ -538,7 +578,7 @@ const Home = () => {
         {!loading && !error && trips.length > 0 && shown.length === 0 && (
           <Hint>
             {filter === "shared"
-              ? "還沒有共享的旅程。打開旅程，按上方的 👥 邀請同行的人一起編輯。"
+              ? "還沒有共享的旅程。打開旅程，按上方的成員按鈕邀請同行的人一起編輯。"
               : "沒有個人旅程"}
           </Hint>
         )}

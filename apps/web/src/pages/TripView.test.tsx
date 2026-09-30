@@ -75,7 +75,7 @@ describe("TripView", () => {
   it("fetch 後顯示旅行日期區間", async () => {
     renderAt("/trip/trip-kyushu/schedule");
     await waitFor(() =>
-      expect(screen.getByText("2024-04-01 → 2024-04-07")).toBeInTheDocument()
+      expect(screen.getByText("2024-04-01 → 04-07")).toBeInTheDocument()
     );
   });
 
@@ -124,7 +124,7 @@ describe("TripView", () => {
   it("返回按鈕連結到首頁", async () => {
     renderAt("/trip/trip-kyushu/schedule");
     await waitFor(() => {
-      const back = screen.getByRole("link", { name: "‹" });
+      const back = screen.getByRole("link", { name: "回首頁" });
       expect(back).toHaveAttribute("href", "/");
     });
   });
@@ -139,7 +139,7 @@ describe("TripView", () => {
     renderAt("/trip/trip-kyushu/schedule", <LockingChild />);
     await screen.findByText("editing child");
 
-    const back = screen.getByRole("link", { name: "‹" });
+    const back = screen.getByRole("link", { name: "回首頁" });
     expect(back).toHaveAttribute("aria-disabled", "true");
     // fireEvent returns false when the click was prevented.
     expect(fireEvent.click(back)).toBe(false);

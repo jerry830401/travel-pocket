@@ -6,12 +6,15 @@ import type { TripOutletContext } from "./TripView";
 import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
 import { EditModal, FieldInput, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
 import { useEditSession } from "../components/editor/useEditSession";
+import { btn } from "../components/btn";
+import { Icon } from "../components/icons";
+import { infoIconName } from "../infoIcon";
 
-const EXT = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-  </svg>
-);
+/* A card's icon: a line icon for a known name ("Plane"), else the text as typed (an emoji). */
+function InfoIcon({ icon }: { icon: string }) {
+  const name = infoIconName(icon);
+  return name ? <Icon name={name} size={19} /> : <>{icon}</>;
+}
 
 /* Edit state discriminated union */
 type EditState =
@@ -39,6 +42,7 @@ const Info = () => {
   );
   const { data: items, setData: setItems, load } = session;
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [editable, setEditable] = useState(false);
   const canEdit = editable && session.editing && !session.saving;
 
@@ -56,7 +60,7 @@ const Info = () => {
         setEditable(editable);
         setLoading(false);
       })
-      .catch(console.error);
+      .catch(() => { setError(true); setLoading(false); });
   }, [trip, reloads]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── InfoItem actions ── */
@@ -142,11 +146,18 @@ const Info = () => {
     return "新增連結";
   })();
 
-  return (
-    <div style={{ padding: "18px 18px 84px", background: "var(--bg)" }}>
-      {apiEnabled && !loading && !editable && <ReadOnlyBanner />}
+  const retry = () => {
+    setLoading(true);
+    setError(false);
+    setReloads((r) => r + 1);
+  };
+  const linkCount = items.reduce((n, it) => n + it.links.length, 0);
 
-      {editable && !loading && editSlot && createPortal(
+  return (
+    <div style={{ padding: "20px 18px 84px", background: "var(--bg)" }}>
+      {apiEnabled && !loading && !error && !editable && <ReadOnlyBanner />}
+
+      {editable && !loading && !error && editSlot && createPortal(
         <EditControls
           editing={session.editing}
           saving={session.saving}
@@ -162,24 +173,48 @@ const Info = () => {
         actionSlot
       )}
 
-      <div className="font-hand font-bold mb-3.5" style={{ fontSize: "1.6rem", color: "var(--ink)" }}>
-        小筆記
+      <div className="flex items-baseline justify-between mb-3.5 mx-0.5">
+        <div className="font-hand font-bold" style={{ fontSize: "1.75rem", lineHeight: 1, color: "var(--ink)" }}>
+          小筆記
+        </div>
+        {!loading && !error && items.length > 0 && (
+          <span className="font-mono" style={{ fontSize: ".7rem", letterSpacing: ".1em", color: "var(--ink-soft)" }}>
+            {items.length} 類 · {linkCount} 個連結
+          </span>
+        )}
       </div>
 
       {loading && (
-        <div className="text-center py-10 font-hand" style={{ color: "var(--ink-soft)", fontSize: "1.2rem" }}>
-          載入資訊中...
+        [...Array(2)].map((_, i) => (
+          <div key={i} className="skeleton" style={{
+            height: i === 0 ? 180 : 130,
+            borderRadius: 12,
+            marginBottom: 16,
+            transform: i % 2 === 0 ? "rotate(-.2deg)" : "rotate(.2deg)",
+          }} />
+        ))
+      )}
+
+      {error && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 font-hand" style={{ color: "var(--ink-soft)" }}>
+          <span className="st-fd flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: "50%" }}>
+            <Icon name="cloudOff" size={24} strokeWidth={1.8} />
+          </span>
+          <p style={{ fontSize: "1.2rem", color: "var(--ink)" }}>資訊載入失敗</p>
+          <button onClick={retry} className="font-hand font-bold" style={btn("primary")}>
+            重試
+          </button>
         </div>
       )}
 
-      {!loading && items.map((item, i) => (
+      {!loading && !error && items.map((item, i) => (
         <div
           key={item.id}
           style={{
             background: "var(--paper)",
             border: "1px solid color-mix(in srgb, var(--rule) 55%, transparent)",
             borderRadius: 12,
-            marginBottom: 14,
+            marginBottom: 16,
             overflow: "hidden",
             boxShadow: "2px 2px 0 var(--rule)",
             transform: i % 2 === 0 ? "rotate(-.2deg)" : "rotate(.2deg)",
@@ -187,24 +222,25 @@ const Info = () => {
         >
           {/* Card header */}
           <div
-            className="flex items-center gap-3.5 px-4 py-3.5"
+            className="flex items-center gap-3 px-4 py-3"
             style={{ borderBottom: "1.5px dashed var(--rule)" }}
           >
             <div
-              className="flex items-center justify-center font-hand font-bold shrink-0"
+              className="st-in flex items-center justify-center font-hand font-bold shrink-0"
               style={{
-                width: 38, height: 38, borderRadius: "50%",
-                background: "var(--yel-soft)", color: "#7a5a20",
+                width: 40, height: 40, borderRadius: "50%",
                 fontSize: 18,
-                boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,.5)",
                 transform: "rotate(-3deg)",
               }}
             >
-              {item.icon}
+              <InfoIcon icon={item.icon} />
             </div>
-            <div className="font-hand font-bold flex-1" style={{ fontSize: "1.4rem", lineHeight: 1, color: "var(--ink)" }}>
+            <div className="font-hand font-bold flex-1" style={{ fontSize: "1.45rem", lineHeight: 1, color: "var(--ink)" }}>
               {item.title}
             </div>
+            {!canEdit && (
+              <span className="font-mono" style={{ fontSize: ".7rem", color: "var(--ink-faint)" }}>{item.links.length}</span>
+            )}
             {canEdit && (
               <div className="flex gap-0.5">
                 <EditBtn onClick={(e) => openEditItem(item, e)} />
@@ -228,8 +264,9 @@ const Info = () => {
                 rel="noopener noreferrer"
                 className="flex items-center justify-between flex-1 min-w-0"
                 style={{
-                  padding: "12px 18px",
-                  fontSize: ".92rem",
+                  minHeight: 46,
+                  padding: "0 18px",
+                  fontSize: ".95rem",
                   color: "var(--ink)",
                   textDecoration: "none",
                 }}
@@ -243,7 +280,7 @@ const Info = () => {
                 }}
               >
                 <span className="truncate">{link.label}</span>
-                <span style={{ color: "var(--ink-faint)", flexShrink: 0, marginLeft: 8 }}>{EXT}</span>
+                <span style={{ color: "var(--ink-faint)", flexShrink: 0, marginLeft: 8, display: "flex" }}><Icon name="external" size={14} /></span>
               </a>
               {canEdit && (
                 <div className="flex gap-0.5 px-2 shrink-0">
@@ -276,7 +313,7 @@ const Info = () => {
             onSave={handleSave}
           >
             <FieldInput label="標題" value={itemDraft.title} onChange={(v) => setItemDraft((d) => ({ ...d, title: v }))} placeholder="資訊類別名稱" />
-            <FieldInput label="圖示（emoji）" value={itemDraft.icon} onChange={(v) => setItemDraft((d) => ({ ...d, icon: v }))} placeholder="🛂" />
+            <FieldInput label="圖示（Plane、Landmark 等名稱或 emoji）" value={itemDraft.icon} onChange={(v) => setItemDraft((d) => ({ ...d, icon: v }))} placeholder="Plane" />
           </EditModal>
 
           <EditModal

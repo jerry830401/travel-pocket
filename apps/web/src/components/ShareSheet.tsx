@@ -10,32 +10,40 @@ import {
 } from "../dataSource";
 import { useToast } from "../contexts/ToastContext";
 import { Sheet } from "./editor";
+import { btn } from "./btn";
+import { Icon } from "./icons";
 
 const sectionTitle: React.CSSProperties = {
-  fontSize: ".7rem", fontFamily: "'JetBrains Mono', monospace",
-  letterSpacing: ".14em", textTransform: "uppercase",
-  color: "var(--ink-soft)", margin: "18px 0 8px",
+  fontSize: ".66rem", fontFamily: "'DM Mono', ui-monospace, monospace",
+  letterSpacing: ".16em", textTransform: "uppercase",
+  color: "var(--ink-soft)", margin: "20px 0 6px",
 };
 
-const pill = (color: string, filled = false): React.CSSProperties => ({
-  padding: "3px 12px", borderRadius: 14, flexShrink: 0,
-  border: `1.5px solid ${color}`,
-  background: filled ? color : "transparent", color: filled ? "var(--paper)" : color,
-  fontSize: ".95rem", cursor: "pointer",
-});
+/* Each person gets a letter on a colored sticker; the color follows the email. */
+const AVATARS = ["st-tr", "st-sg", "st-ht", "st-in", "st-pl"];
 
-const emailStyle: React.CSSProperties = {
-  fontSize: ".8rem", letterSpacing: ".04em", color: "var(--ink)",
-};
+function Avatar({ email }: { email: string }) {
+  const hue = [...email].reduce((n, c) => n + c.charCodeAt(0), 0) % AVATARS.length;
+  return (
+    <span
+      aria-hidden
+      className={`${AVATARS[hue]} font-hand font-bold flex items-center justify-center shrink-0`}
+      style={{ width: 34, height: 34, borderRadius: "50%", fontSize: 19 }}
+    >
+      {email.charAt(0).toUpperCase()}
+    </span>
+  );
+}
 
 function Row({ email, tag, children }: { email: string; tag?: string; children?: React.ReactNode }) {
   return (
-    <li className="flex items-center justify-between gap-3 py-2" style={{ borderBottom: "1.5px dashed var(--rule)" }}>
-      <span className="font-mono truncate" style={emailStyle}>
+    <li className="flex items-center gap-2.5 py-2" style={{ borderBottom: "1.5px dashed var(--rule)" }}>
+      <Avatar email={email} />
+      <span className="font-mono truncate flex-1 min-w-0" style={{ fontSize: ".8rem", color: "var(--ink)" }}>
         {email}
-        {tag && <span className="font-hand" style={{ color: "var(--ink-soft)", marginLeft: 6 }}>{tag}</span>}
       </span>
-      {children && <span className="flex gap-1.5 font-hand font-bold">{children}</span>}
+      {tag && <span className="font-hand shrink-0" style={{ fontSize: "1rem", color: "var(--ink-soft)" }}>{tag}</span>}
+      {children && <span className="flex gap-1.5 font-hand font-bold shrink-0">{children}</span>}
     </li>
   );
 }
@@ -136,11 +144,11 @@ export function ShareSheet({ trip, open, onClose, onLeft }: ShareSheetProps) {
   const link = members?.inviteCode ? inviteLink(members.inviteCode) : null;
 
   return (
-    <Sheet title="成員" icon="👥" open={open} onClose={onClose}>
+    <Sheet title="成員" icon="users" open={open} onClose={onClose}>
       {error && (
         <div className="flex flex-col items-center gap-3 py-6 font-hand" style={{ color: "var(--ink-soft)" }}>
           <p style={{ fontSize: "1.05rem" }}>成員載入失敗</p>
-          <button onClick={() => void reload()} className="font-hand font-bold" style={pill("var(--ink)", true)}>
+          <button onClick={() => void reload()} className="font-hand font-bold" style={btn("primary")}>
             重試
           </button>
         </div>
@@ -155,11 +163,11 @@ export function ShareSheet({ trip, open, onClose, onLeft }: ShareSheetProps) {
           {isOwner && (
             <section>
               <h3 style={{ ...sectionTitle, marginTop: 0 }}>邀請連結</h3>
-              <p className="font-hand" style={{ fontSize: ".98rem", color: "var(--ink-soft)", lineHeight: 1.4 }}>
+              <p style={{ fontSize: ".85rem", color: "var(--ink-soft)", lineHeight: 1.6 }}>
                 拿到連結的人用 Google 登入後可以申請加入，你同意後對方才看得到、也能一起編輯這趟旅程。
               </p>
               {link ? (
-                <div className="flex flex-col gap-2 mt-2.5">
+                <div className="flex flex-col gap-2.5 mt-2.5">
                   <input
                     readOnly
                     aria-label="邀請連結"
@@ -167,17 +175,19 @@ export function ShareSheet({ trip, open, onClose, onLeft }: ShareSheetProps) {
                     onFocus={(e) => e.currentTarget.select()}
                     className="font-mono"
                     style={{
-                      width: "100%", padding: "7px 10px", fontSize: ".75rem",
+                      width: "100%", height: 40, padding: "0 12px", fontSize: ".75rem",
                       background: "var(--paper-2)", border: "1.5px dashed var(--rule)",
                       borderRadius: 8, color: "var(--ink)", outline: "none",
                     }}
                   />
                   <div className="flex gap-2 font-hand font-bold">
-                    <button onClick={() => void copyLink(link)} style={pill("var(--ink)", true)}>
+                    <button onClick={() => void copyLink(link)} style={btn("primary")}>
+                      <Icon name="copy" size={15} />
                       複製連結
                     </button>
                     {typeof navigator.share === "function" && (
-                      <button onClick={() => void shareLink(link)} style={pill("var(--ink)")}>
+                      <button onClick={() => void shareLink(link)} style={btn("outline")}>
+                        <Icon name="share" size={15} />
                         分享
                       </button>
                     )}
@@ -187,7 +197,7 @@ export function ShareSheet({ trip, open, onClose, onLeft }: ShareSheetProps) {
                 <button
                   onClick={() => void createLink()}
                   className="font-hand font-bold mt-2.5"
-                  style={pill("var(--red)", true)}
+                  style={btn("accent")}
                 >
                   建立邀請連結
                 </button>
@@ -197,14 +207,14 @@ export function ShareSheet({ trip, open, onClose, onLeft }: ShareSheetProps) {
 
           {isOwner && pending.length > 0 && (
             <section>
-              <h3 style={sectionTitle}>申請加入</h3>
+              <h3 style={sectionTitle}>申請加入 · {pending.length}</h3>
               <ul>
                 {pending.map((member) => (
                   <Row key={member.email} email={member.email}>
-                    <button onClick={() => void approve(member.email)} style={pill("var(--green)", true)}>
+                    <button onClick={() => void approve(member.email)} style={btn("ok", 36)}>
                       同意
                     </button>
-                    <button onClick={() => remove(member)} style={pill("var(--ink-soft)")}>
+                    <button onClick={() => remove(member)} style={btn("muted", 36)}>
                       拒絕
                     </button>
                   </Row>
@@ -214,13 +224,13 @@ export function ShareSheet({ trip, open, onClose, onLeft }: ShareSheetProps) {
           )}
 
           <section>
-            <h3 style={isOwner ? sectionTitle : { ...sectionTitle, marginTop: 0 }}>成員</h3>
+            <h3 style={isOwner ? sectionTitle : { ...sectionTitle, marginTop: 0 }}>成員 · {approved.length + 1}</h3>
             <ul>
               <Row email={members.ownerEmail} tag={isOwner ? "擁有者（你）" : "擁有者"} />
               {approved.map((member) => (
                 <Row key={member.email} email={member.email}>
                   {isOwner && (
-                    <button onClick={() => remove(member)} style={pill("var(--red)")}>
+                    <button onClick={() => remove(member)} style={btn("danger", 36)}>
                       移除
                     </button>
                   )}
@@ -238,7 +248,7 @@ export function ShareSheet({ trip, open, onClose, onLeft }: ShareSheetProps) {
             <button
               onClick={leave}
               className="font-hand font-bold mt-6 w-full"
-              style={{ ...pill("var(--red)"), padding: "8px 0" }}
+              style={{ ...btn("danger", 44), width: "100%" }}
             >
               退出旅程
             </button>

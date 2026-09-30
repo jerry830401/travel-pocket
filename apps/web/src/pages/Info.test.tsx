@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import type { InfoItem, Trip } from "../types";
@@ -61,10 +62,28 @@ describe("Info", () => {
     } as Response);
   });
 
-  it("fetch 前顯示載入中提示", () => {
+  it("fetch 前顯示 skeleton 佔位符", () => {
     vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
     renderInfo();
-    expect(screen.getByText("載入資訊中...")).toBeInTheDocument();
+    expect(document.querySelectorAll(".skeleton").length).toBeGreaterThan(0);
+  });
+
+  it("fetch 失敗時顯示錯誤，按重試再讀一次", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Network"));
+    renderInfo();
+    await userEvent.click(await screen.findByRole("button", { name: "重試" }));
+    expect(await screen.findByText("入境資訊")).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("圖示是已知名稱時畫成線條圖示，不顯示名稱文字", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([{ ...mockItems[0], icon: "Plane" }]),
+    } as Response);
+    renderInfo();
+    await screen.findByText("入境資訊");
+    expect(screen.queryByText("Plane")).not.toBeInTheDocument();
   });
 
   it("fetch 後顯示 InfoItem 標題", async () => {

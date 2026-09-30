@@ -245,7 +245,7 @@ describe("排序與篩選", () => {
 
     expect(within(card("奈良")).getByText("alice@example.com 分享")).toBeInTheDocument();
     expect(within(card("大阪")).getByText("與 1 人共享")).toBeInTheDocument();
-    expect(within(card("大阪")).getByText("✋ 2 人申請加入")).toBeInTheDocument();
+    expect(within(card("大阪")).getByText("2 人申請加入")).toBeInTheDocument();
     expect(within(card("東京春遊")).queryByText(/共享|分享/)).not.toBeInTheDocument();
   });
 

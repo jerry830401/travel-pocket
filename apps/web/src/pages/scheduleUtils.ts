@@ -22,6 +22,23 @@ export function weekday(d: string) {
 }
 
 /**
+ * Where the 現在 line goes among a day's sorted items at `now` (minutes since
+ * midnight): before the first item that has not started yet, by its start time
+ * or, for an arrival, its end time. Untimed items stay with the item before
+ * them. items.length once every item has started.
+ */
+export function nowIndex(items: ItineraryItem[], now: number): number {
+  let idx = items.length;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const mins = toMins(items[i].startTime) ?? toMins(items[i].endTime);
+    if (mins === null) continue;
+    if (mins <= now) break;
+    idx = i;
+  }
+  return idx;
+}
+
+/**
  * A day's items in time order: by start time, or by end time for an item with
  * only that (an arrival). An item with neither stays after the one before it,
  * and items at the same time keep their order.
