@@ -39,7 +39,7 @@ describe("Settings", () => {
   it("顯示標題，返回連結指向首頁", () => {
     renderSettings();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("設定");
-    expect(screen.getByRole("link", { name: "‹" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "回首頁" })).toHaveAttribute("href", "/");
   });
 
   describe("外觀", () => {

@@ -61,14 +61,20 @@ describe("Home", () => {
     expect(screen.queryByRole("group", { name: "篩選旅程" })).not.toBeInTheDocument();
   });
 
-  it("春季旅行顯示 ❄ 春 標籤", async () => {
+  it("春季旅行顯示「春」標籤", async () => {
     render(<Home />, { wrapper: Wrapper });
-    await waitFor(() => expect(screen.getByText("❄ 春")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("春")).toBeInTheDocument());
   });
 
-  it("夏季旅行顯示 ☀ 夏 標籤", async () => {
+  it("夏季旅行顯示「夏」標籤", async () => {
     render(<Home />, { wrapper: Wrapper });
-    await waitFor(() => expect(screen.getByText("☀ 夏")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("夏")).toBeInTheDocument());
+  });
+
+  it("已經結束的旅行蓋上「已結束」郵戳", async () => {
+    render(<Home />, { wrapper: Wrapper });
+    await screen.findByText("東京春遊");
+    expect(screen.getAllByText("已結束")).toHaveLength(2);
   });
 
   it("旅行卡片連結指向正確路徑", async () => {

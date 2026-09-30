@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Icon } from "../components/icons";
 
 type ToastKind = "success" | "error";
 
@@ -55,16 +56,16 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
               className="font-hand font-bold flex items-center gap-2 pointer-events-auto"
               style={{
                 maxWidth: 448,
-                padding: "8px 18px",
+                padding: "7px 18px",
                 borderRadius: 18,
                 background: toast.kind === "error" ? "var(--red)" : "var(--ink)",
-                color: toast.kind === "error" ? "#fff" : "var(--paper)",
-                fontSize: "1rem",
-                boxShadow: "0 6px 20px rgba(40,30,20,.25)",
+                color: toast.kind === "error" ? "var(--on-accent)" : "var(--paper)",
+                fontSize: "1.1rem",
+                boxShadow: "0 6px 20px var(--shadow)",
                 cursor: "pointer",
               }}
             >
-              <span aria-hidden>{toast.kind === "error" ? "✕" : "✓"}</span>
+              <Icon name={toast.kind === "error" ? "x" : "check"} size={15} strokeWidth={2.8} />
               <span>{toast.message}</span>
             </motion.div>
           )}

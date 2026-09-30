@@ -5,7 +5,7 @@ import {
   EditModal,
   FieldInput,
   FieldTextarea,
-  FieldSelect,
+  FieldStickers,
   FieldTags,
   EditBtn,
   DeleteBtn,
@@ -85,7 +85,7 @@ describe("EditModal", () => {
         <div />
       </EditModal>
     );
-    await user.click(screen.getByRole("button", { name: "×" }));
+    await user.click(screen.getByRole("button", { name: "關閉" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
@@ -139,30 +139,26 @@ describe("FieldTextarea", () => {
   });
 });
 
-/* ── FieldSelect ───────────────────────────────────────────────── */
+/* ── FieldStickers ─────────────────────────────────────────────── */
 
-describe("FieldSelect", () => {
+describe("FieldStickers", () => {
   const options = [
-    { value: "food", label: "食物" },
-    { value: "hotel", label: "住宿" },
+    { value: "food", label: "餐廳", glyph: "食", cls: "st-fd" },
+    { value: "hotel", label: "住宿", glyph: "住", cls: "st-ht" },
   ];
 
-  it("顯示 label 文字", () => {
-    render(<FieldSelect label="類別" value="food" onChange={vi.fn()} options={options} />);
-    expect(screen.getByText("類別")).toBeInTheDocument();
+  it("每個選項是一個以名稱標示的 radio，選中的標成 checked", () => {
+    render(<FieldStickers label="類別" value="food" onChange={vi.fn()} options={options} />);
+    expect(screen.getByRole("radiogroup", { name: "類別" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "餐廳" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "住宿" })).toHaveAttribute("aria-checked", "false");
   });
 
-  it("渲染所有 option", () => {
-    render(<FieldSelect label="類別" value="food" onChange={vi.fn()} options={options} />);
-    expect(screen.getByRole("option", { name: "食物" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "住宿" })).toBeInTheDocument();
-  });
-
-  it("選擇不同選項時觸發 onChange", async () => {
+  it("點另一個貼紙時觸發 onChange", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(<FieldSelect label="類別" value="food" onChange={onChange} options={options} />);
-    await user.selectOptions(screen.getByRole("combobox"), "hotel");
+    render(<FieldStickers label="類別" value="food" onChange={onChange} options={options} />);
+    await user.click(screen.getByRole("radio", { name: "住宿" }));
     expect(onChange).toHaveBeenCalledWith("hotel");
   });
 });

@@ -54,7 +54,7 @@ test.describe("設定頁", () => {
   });
 
   test("返回按鈕回首頁", async ({ page }) => {
-    await page.getByRole("link", { name: "‹" }).click();
+    await page.getByRole("link", { name: "回首頁" }).click();
     await expect(page.getByRole("heading", { name: "Travel Pocket" })).toBeVisible();
   });
 });

@@ -1,13 +1,15 @@
 import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { circleBtn } from "../circleBtn";
+import { btn } from "../btn";
+import { Icon, type IconName } from "../icons";
 
 /* ── Bottom sheet ───────────────────────────────────────────────── */
 
 interface SheetProps {
   /** Shown in the header, after `icon`; also names the dialog. */
   title: string;
-  icon: string;
+  icon: IconName;
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
@@ -25,7 +27,7 @@ export function Sheet({ title, icon, open, onClose, children }: SheetProps) {
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 z-40"
-            style={{ background: "rgba(40,30,20,.45)", backdropFilter: "blur(4px)" }}
+            style={{ background: "var(--scrim)", backdropFilter: "blur(3px)" }}
           />
           <motion.div
             role="dialog"
@@ -39,31 +41,27 @@ export function Sheet({ title, icon, open, onClose, children }: SheetProps) {
               maxWidth: 480,
               maxHeight: "90vh",
               background: "var(--paper)",
-              borderRadius: "20px 20px 0 0",
+              borderRadius: "22px 22px 0 0",
               borderTop: "2px dashed var(--red)",
-              boxShadow: "0 -8px 40px rgba(40,30,20,.2)",
-              padding: "20px 20px 32px",
+              boxShadow: "0 -8px 40px var(--shadow)",
+              padding: "14px 20px 30px",
             }}
           >
             {/* Handle */}
-            <div style={{ width: 44, height: 4, background: "var(--red)", borderRadius: 2, margin: "0 auto 16px", opacity: .5 }} />
+            <div style={{ width: 44, height: 4, background: "var(--red)", borderRadius: 2, margin: "0 auto 14px", opacity: .5 }} />
 
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-              <span className="font-hand font-bold" style={{ fontSize: "1.4rem", color: "var(--red)" }}>
-                {icon} {title}
+              <span className="font-hand font-bold flex items-center gap-2" style={{ fontSize: 26, color: "var(--red)" }}>
+                <Icon name={icon} size={20} />
+                {title}
               </span>
               <button
                 onClick={onClose}
-                style={{
-                  width: 30, height: 30, borderRadius: "50%",
-                  border: "1.5px solid var(--ink)",
-                  background: "var(--paper)", color: "var(--ink)",
-                  fontSize: 16, cursor: "pointer", display: "flex",
-                  alignItems: "center", justifyContent: "center",
-                }}
+                aria-label="關閉"
+                style={{ ...circleBtn, width: 40, height: 40, background: "var(--paper)", cursor: "pointer" }}
               >
-                ×
+                <Icon name="x" size={15} strokeWidth={2.5} />
               </button>
             </div>
 
@@ -89,35 +87,18 @@ interface EditModalProps {
 
 export function EditModal({ title, open, onClose, onSave, children }: EditModalProps) {
   return (
-    <Sheet title={title} icon="✏" open={open} onClose={onClose}>
+    <Sheet title={title} icon="pencil" open={open} onClose={onClose}>
       {/* Form content */}
       <div className="flex flex-col gap-3">
         {children}
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2.5 mt-5">
-        <button
-          onClick={onClose}
-          style={{
-            flex: 1, padding: "10px 0", borderRadius: 12,
-            border: "1.5px solid var(--ink)",
-            background: "transparent", color: "var(--ink)",
-            fontFamily: "inherit", fontSize: ".95rem", cursor: "pointer",
-          }}
-        >
+      <div className="flex gap-2.5 mt-5 font-hand font-bold">
+        <button onClick={onClose} style={{ ...btn("outline", 46), flex: 1 }}>
           取消
         </button>
-        <button
-          onClick={onSave}
-          style={{
-            flex: 2, padding: "10px 0", borderRadius: 12,
-            border: "1.5px solid var(--red)",
-            background: "var(--red)", color: "#fff",
-            fontFamily: "inherit", fontSize: ".95rem", fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={onSave} style={{ ...btn("accent", 46), flex: 2 }}>
           確定
         </button>
       </div>
@@ -128,17 +109,17 @@ export function EditModal({ title, open, onClose, onSave, children }: EditModalP
 /* ── Form fields ────────────────────────────────────────────────── */
 
 const labelStyle: React.CSSProperties = {
-  fontSize: ".7rem", fontFamily: "'JetBrains Mono', monospace",
+  fontSize: ".66rem", fontFamily: "'DM Mono', ui-monospace, monospace",
   letterSpacing: ".14em", textTransform: "uppercase",
-  color: "var(--ink-soft)", marginBottom: 4, display: "block",
+  color: "var(--ink-soft)", marginBottom: 5, display: "block",
 };
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "8px 12px",
+  width: "100%", minHeight: 42, padding: "9px 12px",
   background: "var(--paper-2)",
   border: "1.5px dashed var(--rule)",
   borderRadius: 8, color: "var(--ink)",
-  fontFamily: "inherit", fontSize: ".92rem",
+  fontFamily: "inherit", fontSize: 15,
   outline: "none", boxSizing: "border-box",
 };
 
@@ -182,32 +163,63 @@ export function FieldTextarea({ label, value, onChange, placeholder, rows = 3 }:
         placeholder={placeholder}
         rows={rows}
         onChange={(e) => onChange(e.target.value)}
-        style={{ ...inputStyle, resize: "vertical" }}
+        style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
       />
     </div>
   );
 }
 
-interface FieldSelectProps {
+/* Pick one of a few stickers (the schedule's categories): each is a round
+   button showing its glyph, named by its label; the picked one's label is
+   repeated after the field's. */
+export interface StickerOption {
+  value: string;
+  label: string;
+  glyph: string;
+  /** The sticker's color class (.st-*). */
+  cls: string;
+}
+
+interface FieldStickersProps {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: StickerOption[];
 }
 
-export function FieldSelect({ label, value, onChange, options }: FieldSelectProps) {
+export function FieldStickers({ label, value, onChange, options }: FieldStickersProps) {
+  const picked = options.find((o) => o.value === value);
   return (
     <div>
-      <span style={labelStyle}>{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ ...inputStyle, cursor: "pointer" }}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+      <span style={labelStyle}>
+        {label}
+        {picked && <span style={{ color: "var(--ink)", marginLeft: 8 }}>· {picked.label}</span>}
+      </span>
+      <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5" style={{ paddingTop: 2 }}>
+        {options.map((o) => {
+          const on = o.value === value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={o.label}
+              title={o.label}
+              onClick={() => onChange(o.value)}
+              className={o.cls}
+              style={{
+                width: 36, height: 36, borderRadius: "50%", border: "none", padding: 0,
+                fontSize: 15, fontWeight: 600, cursor: "pointer",
+                transform: on ? "rotate(-6deg)" : undefined,
+                boxShadow: on ? "0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink)" : undefined,
+              }}
+            >
+              {o.glyph}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -246,39 +258,35 @@ interface FieldImageProps {
   busy?: boolean;
 }
 
-const imageBtn: React.CSSProperties = {
-  padding: "6px 14px", borderRadius: 14,
-  border: "1.5px solid var(--ink)",
-  background: "transparent", color: "var(--ink)",
-  fontFamily: "inherit", fontSize: ".85rem", cursor: "pointer",
-};
-
 export function FieldImage({ label, value, onPick, onRemove, busy }: FieldImageProps) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <div>
       <span style={labelStyle}>{label}</span>
       <div
-        className="flex items-center justify-center overflow-hidden"
-        style={{ height: 170, borderRadius: 8, background: "var(--paper-2)", border: "1.5px dashed var(--rule)" }}
+        className={`flex flex-col items-center justify-center gap-1.5 overflow-hidden ${value ? "" : "hatch-bg"}`}
+        style={{ height: 170, borderRadius: 8, background: value ? "var(--paper-2)" : undefined, border: "1.5px dashed var(--rule)", color: "var(--ink-faint)" }}
       >
         {value ? (
           <img src={value} alt={`${label}預覽`} className="w-full h-full object-cover" />
         ) : (
-          <span className="font-hand" style={{ fontSize: "1rem", color: "var(--ink-soft)" }}>還沒有圖片</span>
+          <>
+            <Icon name="briefcase" size={30} strokeWidth={1.6} />
+            <span className="font-hand" style={{ fontSize: "1rem", color: "var(--ink-soft)" }}>還沒有圖片</span>
+          </>
         )}
       </div>
-      <div className="flex gap-2 mt-2">
+      <div className="flex gap-2 mt-2 font-hand font-bold">
         <button
           type="button"
           onClick={() => input.current?.click()}
           disabled={busy}
-          style={{ ...imageBtn, opacity: busy ? .5 : 1 }}
+          style={{ ...btn("outline", 36), opacity: busy ? .5 : 1 }}
         >
           {busy ? "處理中…" : value ? "更換圖片" : "選擇圖片"}
         </button>
         {value && !busy && (
-          <button type="button" onClick={onRemove} style={{ ...imageBtn, borderColor: "var(--red)", color: "var(--red)" }}>
+          <button type="button" onClick={onRemove} style={btn("danger", 36)}>
             移除
           </button>
         )}
@@ -304,38 +312,22 @@ export function FieldImage({ label, value, onPick, onRemove, busy }: FieldImageP
 const actionBtn: React.CSSProperties = {
   display: "inline-flex", alignItems: "center", justifyContent: "center",
   border: "none", background: "transparent", cursor: "pointer",
-  padding: 4, borderRadius: 6, lineHeight: 1,
+  width: 32, height: 34, padding: 0, borderRadius: 8, lineHeight: 1,
   transition: "opacity .15s",
 };
 
 export function EditBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
-    <button
-      onClick={onClick}
-      title="編輯"
-      style={{ ...actionBtn, color: "var(--blue)" }}
-    >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-      </svg>
+    <button onClick={onClick} title="編輯" style={{ ...actionBtn, color: "var(--blue)" }}>
+      <Icon name="edit" size={16} strokeWidth={2.2} />
     </button>
   );
 }
 
 export function DeleteBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
-    <button
-      onClick={onClick}
-      title="刪除"
-      style={{ ...actionBtn, color: "var(--red)" }}
-    >
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-        <path d="M10 11v6M14 11v6"/>
-        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-      </svg>
+    <button onClick={onClick} title="刪除" style={{ ...actionBtn, color: "var(--red)" }}>
+      <Icon name="trash" size={16} strokeWidth={2.2} />
     </button>
   );
 }
@@ -347,27 +339,18 @@ interface AddBtnProps {
   bar?: boolean;
 }
 
-const addBtnBar: React.CSSProperties = {
-  flex: 1, maxWidth: 200, height: 38, borderRadius: 19, fontSize: "1.1rem",
-};
-
 export function AddBtn({ onClick, label, bar }: AddBtnProps) {
   return (
     <button
       onClick={onClick}
-      className="font-hand font-bold flex items-center justify-center gap-1.5"
+      className="font-hand font-bold"
       style={{
-        padding: "5px 14px", borderRadius: 14,
-        border: "1.5px dashed var(--ink)",
-        background: "transparent", color: "var(--ink)",
-        fontSize: ".9rem", cursor: "pointer",
+        ...btn("add", bar ? 42 : 34),
         transition: "opacity .15s",
-        ...(bar && addBtnBar),
+        ...(bar && { flex: 1, maxWidth: 200, fontSize: 19 }),
       }}
     >
-      <svg width={bar ? 15 : 13} height={bar ? 15 : 13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
+      <Icon name="plus" size={bar ? 15 : 13} strokeWidth={2.6} />
       {label ?? "新增"}
     </button>
   );
@@ -389,9 +372,7 @@ export function EditControls({ editing, saving, onStart, onCancel, onFinish }: E
   if (!editing) {
     return (
       <button onClick={onStart} aria-label="編輯" style={{ ...circleBtn, cursor: "pointer" }}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
+        <Icon name="pencil" size={17} strokeWidth={2.2} />
       </button>
     );
   }
@@ -399,9 +380,7 @@ export function EditControls({ editing, saving, onStart, onCancel, onFinish }: E
   return (
     <div className="flex items-center gap-2 shrink-0">
       <button onClick={onCancel} disabled={saving} aria-label="取消" style={{ ...circleBtn, ...busy }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
-          <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
-        </svg>
+        <Icon name="x" size={16} strokeWidth={2.5} />
       </button>
       <button
         onClick={onFinish}
@@ -409,10 +388,25 @@ export function EditControls({ editing, saving, onStart, onCancel, onFinish }: E
         aria-label={saving ? "儲存中…" : "完成"}
         style={{ ...circleBtn, background: "var(--ink)", color: "var(--paper)", ...busy }}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
+        <Icon name="check" size={18} strokeWidth={2.6} />
       </button>
+    </div>
+  );
+}
+
+/* Under the header while a page is in edit mode: nothing is saved until 完成. */
+export function EditingBanner() {
+  return (
+    <div
+      className="font-mono shrink-0 flex items-center gap-2"
+      style={{
+        padding: "6px 16px", fontSize: ".7rem", letterSpacing: ".08em",
+        background: "var(--yel-soft)", color: "var(--yel-ink)",
+        borderBottom: "1.5px dashed var(--rule)",
+      }}
+    >
+      <Icon name="pencil" size={12} strokeWidth={2.4} />
+      編輯中 · 按右上角的勾勾才會儲存
     </div>
   );
 }
@@ -423,19 +417,16 @@ export function ReadOnlyBanner() {
   return (
     <div
       role="status"
-      className="font-mono text-center"
+      className="font-mono flex items-center justify-center gap-2"
       style={{
-        fontSize: ".65rem", letterSpacing: ".14em",
-        padding: "3px 0",
-        background: "repeating-linear-gradient(90deg, var(--red) 0, var(--red) 6px, transparent 6px, transparent 12px)",
-        backgroundSize: "12px 3px",
-        backgroundRepeat: "repeat-x",
-        backgroundPosition: "0 100%",
-        borderBottom: "none",
+        fontSize: ".68rem", letterSpacing: ".14em",
+        padding: "5px 0 7px",
+        background: "repeating-linear-gradient(90deg, var(--red) 0 6px, transparent 6px 12px) 0 100% / 12px 2px repeat-x",
         color: "var(--red)",
       }}
     >
-      ⚠ 離線資料・暫時無法編輯
+      <Icon name="wifiOff" size={13} />
+      離線資料 · 暫時無法編輯
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { apiEnabled, goToSignIn, onSignedOut } from "../dataSource";
+import { btn } from "./btn";
+import { Icon } from "./icons";
 
 /**
  * Cloudflare Access sends a signed-out visitor to its login page before the
@@ -22,7 +24,7 @@ export function SignInGate({ children }: { children: ReactNode }) {
 function SignInScreen() {
   return (
     <div
-      className="flex flex-col items-center justify-center h-full gap-4 px-8 text-center font-hand"
+      className="dot-grid-bg flex flex-col items-center justify-center h-full gap-4 px-8 text-center font-hand"
       style={{ color: "var(--ink-soft)" }}
     >
       <h1
@@ -31,17 +33,11 @@ function SignInScreen() {
       >
         Travel Pocket
       </h1>
-      <p style={{ fontSize: "1.1rem" }}>請先登入，才能查看與編輯你的行程</p>
-      <button
-        onClick={goToSignIn}
-        className="font-hand font-bold"
-        style={{
-          padding: "6px 22px", borderRadius: 18,
-          border: "1.5px solid var(--ink)",
-          background: "var(--ink)", color: "var(--paper)",
-          fontSize: "1rem", cursor: "pointer",
-        }}
-      >
+      <span className="st-tr flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: "50%" }}>
+        <Icon name="lock" size={24} strokeWidth={1.8} />
+      </span>
+      <p style={{ fontSize: "1.15rem" }}>請先登入，才能查看與編輯你的行程</p>
+      <button onClick={goToSignIn} className="font-hand font-bold" style={btn("primary")}>
         前往登入
       </button>
     </div>

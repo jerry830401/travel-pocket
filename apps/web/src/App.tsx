@@ -17,10 +17,10 @@ function App() {
       <ToastProvider>
         <UpdatePrompt />
         <HashRouter>
-          <div className="h-full w-full flex justify-center overflow-hidden" style={{ background: '#e9e2cd' }}>
+          <div className="h-full w-full flex justify-center overflow-hidden" style={{ background: 'var(--desk)' }}>
             <div
               className="w-full max-w-[480px] h-full relative flex flex-col overflow-hidden"
-              style={{ background: 'var(--bg)', boxShadow: '0 0 80px rgba(40,30,20,.18)' }}
+              style={{ background: 'var(--bg)', boxShadow: '0 0 80px var(--shadow)' }}
             >
               <SignInGate>
                 <Routes>

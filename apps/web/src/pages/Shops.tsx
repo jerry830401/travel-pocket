@@ -6,18 +6,9 @@ import type { TripOutletContext } from "./TripView";
 import { apiEnabled, loadTripData, saveTripData } from "../dataSource";
 import { EditModal, FieldInput, FieldTags, EditBtn, DeleteBtn, AddBtn, EditControls, ReadOnlyBanner } from "../components/editor";
 import { useEditSession } from "../components/editor/useEditSession";
+import { btn } from "../components/btn";
+import { Icon } from "../components/icons";
 import { mapSearchUrl } from "../mapSearchUrl";
-
-const PIN_SVG = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
-  </svg>
-);
-const CLK = (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-  </svg>
-);
 
 type ShopDraft = {
   name: string;
@@ -175,6 +166,9 @@ const Shops = () => {
                 }}
               >
                 {tag === "All" ? "全部" : tag}
+                {tag === "All" && (
+                  <span className="font-mono" aria-hidden style={{ fontSize: 11, fontWeight: 400, opacity: .7, marginLeft: 5 }}>{shops.length}</span>
+                )}
               </button>
             );
           })
@@ -184,18 +178,15 @@ const Shops = () => {
       {/* List */}
       <div style={{ padding: "14px 18px 84px" }}>
         {error && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4 font-hand" style={{ color: "var(--ink-soft)" }}>
-            <span style={{ fontSize: "2.4rem" }}>😵</span>
-            <p style={{ fontSize: "1.1rem" }}>店家資訊載入失敗</p>
+          <div className="flex flex-col items-center justify-center py-16 gap-3 font-hand" style={{ color: "var(--ink-soft)" }}>
+            <span className="st-fd flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: "50%" }}>
+              <Icon name="cloudOff" size={24} strokeWidth={1.8} />
+            </span>
+            <p style={{ fontSize: "1.2rem", color: "var(--ink)" }}>店家資訊載入失敗</p>
             <button
               onClick={() => { setLoading(true); setError(false); setRetry((r) => r + 1); }}
               className="font-hand font-bold"
-              style={{
-                padding: "6px 22px", borderRadius: 18,
-                border: "1.5px solid var(--ink)",
-                background: "var(--ink)", color: "var(--paper)",
-                fontSize: "1rem", cursor: "pointer",
-              }}
+              style={btn("primary")}
             >
               重試
             </button>
@@ -247,7 +238,7 @@ const Shops = () => {
               }}
             >
               <div className="flex justify-between items-start gap-2.5 mb-1.5">
-                <div className="font-hand font-bold flex-1 min-w-0" style={{ fontSize: "1.4rem", lineHeight: 1.15, color: "var(--ink)" }}>
+                <div className="font-hand font-bold flex-1 min-w-0" style={{ fontSize: "1.45rem", lineHeight: 1.15, color: "var(--ink)" }}>
                   {shop.name}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -263,26 +254,27 @@ const Shops = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="在 Google Map 查詢地點"
-                      className="flex items-center justify-center transition-all duration-150 hover:rotate-[-8deg] hover:scale-105"
+                      className="flex items-center justify-center transition-all duration-150 hover:rotate-0 hover:scale-105"
                       style={{
-                        width: 34, height: 34, borderRadius: "50%",
+                        width: 40, height: 40, borderRadius: "50%",
                         background: "var(--blue-soft)", color: "var(--blue)",
                         border: "1.5px solid var(--blue)",
                         textDecoration: "none",
+                        transform: "rotate(-6deg)",
                       }}
                     >
-                      {PIN_SVG}
+                      <Icon name="map" size={17} />
                     </a>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5 mb-1" style={{ fontSize: ".82rem", color: "var(--ink-soft)" }}>
-                <span style={{ color: "var(--ink-faint)", flexShrink: 0 }}>{PIN_SVG}</span>
+                <span style={{ color: "var(--ink-faint)", display: "flex" }}><Icon name="pin" size={13} /></span>
                 <span className="truncate">{shop.location}</span>
               </div>
               <div className="flex items-center gap-1.5 mb-2.5" style={{ fontSize: ".82rem", color: "var(--ink-soft)" }}>
-                <span style={{ color: "var(--ink-faint)", flexShrink: 0 }}>{CLK}</span>
-                <span>{shop.businessHours}</span>
+                <span style={{ color: "var(--ink-faint)", display: "flex" }}><Icon name="clock" size={13} /></span>
+                <span className="font-mono" style={{ fontSize: ".76rem" }}>{shop.businessHours}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {shop.tags.map((tag) => (

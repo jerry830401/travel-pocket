@@ -27,7 +27,7 @@ test.describe("旅行詳情", () => {
   });
 
   test("點擊返回按鈕回首頁", async ({ page }) => {
-    await page.getByRole("link", { name: "‹" }).click();
+    await page.getByRole("link", { name: "回首頁" }).click();
     await expect(page.getByRole("heading", { name: "Travel Pocket" })).toBeVisible();
   });
 

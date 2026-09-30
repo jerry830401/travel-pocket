@@ -4,8 +4,8 @@
 export function BottomBar({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="shrink-0 flex items-center px-2 pb-3 pt-2.5 z-30"
-      style={{ minHeight: 64, background: "var(--paper)", borderTop: "1.5px dashed var(--rule)" }}
+      className="shrink-0 flex items-center px-2 pb-3 pt-2 z-30"
+      style={{ minHeight: 66, background: "var(--paper)", borderTop: "1.5px dashed var(--rule)" }}
     >
       {children}
     </div>
